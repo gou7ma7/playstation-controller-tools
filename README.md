@@ -11,7 +11,7 @@ Three independent modules for a Windows controller setup:
 
 - **[mapping/](mapping/README.md)**: left-hand DualShock 4 + right-hand mouse, Steam Input VDF, WASD game settings and champion-specific usage notes. It works without the rumble program.
 - **[rumble/](rumble/README.md)**: Windows USB DS4 feedback based on the local Live Client Data API. It works without this Steam layout and does not require WASD movement or Steam.
-- **[sleep-light/](sleep-light/README.md)**: turn off a USB DS4 lightbar before sleep/hibernate, restore configured blue after user resume/unlock, and keep it off during background automatic wake. No Steam or game dependency.
+- **[sleep-light/](sleep-light/README.md)**: turn off a USB DS4 lightbar after three minutes of controller inactivity and restore configured blue on controller input. Also sends off before sleep/hibernate; resume/unlock alone does not relight in default idle mode. No Steam or game dependency.
 
 Use any module separately or together. None installs or changes another.
 
@@ -90,7 +90,7 @@ sleep-light/             Independent sleep light module
 
 ## Verification and limits
 
-Sleep light offline checks cover background wake versus user resume, repeat notifications, lock/unlock and pending restoration cancellation. The original user visually confirmed USB off/restore and a real S3 sleep → resume/unlock → blue restore cycle with Steam and rumble running. Windows and watcher logs agreed. S4 and the automatic S3-to-S4 sequence are covered by simulated notifications/offline checks; a physical S4 cycle remains unverified.
+Light-control offline checks cover noise filtering, held inputs, the 180-second idle boundary, retries, disconnects, background wake, lock/unlock and cancellation. With Steam running, the original user confirmed three-minute idle off and controller-triggered blue restore; native logs agreed. The original sleep-only version once passed an S3 cycle, but later failures despite successful off writes mean reliable S4 and automatic S3-to-S4 behavior remain unverified.
 
 Default timings and detection behavior are regression-tested against the previous setup. Tests use synthetic game data and simulated motor output. Real-game damage feedback was confirmed by the original user; other presets require personal feel testing. The mapping's functional data matches the exported layout, but importing it on a second computer and accessing its Steam link from another account remain unverified.
 

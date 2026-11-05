@@ -11,7 +11,7 @@ namespace DS4SleepLight {
         internal bool Success { get { return Outcome == "written"; } }
         internal WriteResult(string outcome, int matches, int writes, int error) { Outcome = outcome; Matches = matches; Writes = writes; Win32Error = error; }
     }
-    internal static class NativeHid {
+    internal static partial class NativeHid {
         [StructLayout(LayoutKind.Sequential)] private struct InterfaceData { internal int Size; internal Guid ClassGuid; internal int Flags; internal IntPtr Reserved; }
         [StructLayout(LayoutKind.Sequential)] private struct Attributes { internal int Size; internal ushort Vendor, Product, Version; }
         [StructLayout(LayoutKind.Sequential)] private struct Caps {
@@ -36,7 +36,7 @@ namespace DS4SleepLight {
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern SafeWaitHandle CreateEvent(IntPtr security, bool manual, bool initial, string name);
         [DllImport("kernel32.dll")] private static extern uint WaitForSingleObject(SafeWaitHandle handle, uint timeout);
 
-        private static List<string> Paths() {
+        private static List<string> Paths(bool input = false) {
             Guid guid; HidD_GetHidGuid(out guid);
             IntPtr set = SetupDiGetClassDevs(ref guid, null, IntPtr.Zero, 0x12);
             if (set == new IntPtr(-1)) throw new IOException("HID enumeration failed.");
@@ -64,7 +64,7 @@ namespace DS4SleepLight {
                             try {
                                 Caps caps;
                                 if (HidP_GetCaps(prep, out caps) != 0x110000) throw new IOException("Target capabilities invalid; enumeration refused.");
-                                if (LightReport.Supported(attributes.Vendor, attributes.Product, caps.UsagePage, caps.Usage, caps.OutputLength)) paths.Add(path);
+                                if (LightReport.Supported(attributes.Vendor, attributes.Product, caps.UsagePage, caps.Usage, caps.OutputLength) && (!input || caps.InputLength == 64)) paths.Add(path);
                             } finally { HidD_FreePreparsedData(prep); }
                         }
                     } finally { Marshal.FreeHGlobal(detail); }
@@ -84,12 +84,13 @@ namespace DS4SleepLight {
             try { result = Execute(report, attempts, repeatDelayMs); return result; }
             finally { Log.Write("usb_operation_completed", result, "operation=" + operation + " duration_ms=" + duration.ElapsedMilliseconds); }
         }
-        private static WriteResult Execute(byte[] report, int attempts, int repeatDelayMs) {
+        internal static WriteResult SendQuiet(byte[] report) { return Execute(report, 1, 0, false); }
+        private static WriteResult Execute(byte[] report, int attempts, int repeatDelayMs, bool verbose = true) {
             List<string> paths;
             Stopwatch enumeration = Stopwatch.StartNew();
-            Log.Event("usb_enumeration_begin", "");
+            if (verbose) Log.Event("usb_enumeration_begin", "");
             try { paths = Paths(); } catch (IOException) { return new WriteResult("enumeration_failed", 0, 0, Marshal.GetLastWin32Error()); }
-            Log.Event("usb_enumeration_completed", "matches=" + paths.Count + " duration_ms=" + enumeration.ElapsedMilliseconds);
+            if (verbose) Log.Event("usb_enumeration_completed", "matches=" + paths.Count + " duration_ms=" + enumeration.ElapsedMilliseconds);
             if (paths.Count != 1) return new WriteResult(paths.Count == 0 ? "no_supported_device" : "multiple_devices_refused", paths.Count, 0, 0);
             using (SafeFileHandle file = Open(paths[0], 0x40000000)) {
                 if (file.IsInvalid) return new WriteResult("output_unavailable", 1, 0, Marshal.GetLastWin32Error());
@@ -97,10 +98,10 @@ namespace DS4SleepLight {
                 int writes = 0, error = 0;
                 for (int i = 0; i < attempts; i++) {
                     if (i > 0) System.Threading.Thread.Sleep(repeatDelayMs);
-                    Log.Event("usb_write_attempt_begin", "attempt=" + (i + 1));
+                    if (verbose) Log.Event("usb_write_attempt_begin", "attempt=" + (i + 1));
                     Stopwatch attemptDuration = Stopwatch.StartNew();
                     bool completed = Write(file, report, out error);
-                    Log.Event("usb_write_attempt_completed", "attempt=" + (i + 1) + " success=" + completed + " win32=" + error + " duration_ms=" + attemptDuration.ElapsedMilliseconds);
+                    if (verbose) Log.Event("usb_write_attempt_completed", "attempt=" + (i + 1) + " success=" + completed + " win32=" + error + " duration_ms=" + attemptDuration.ElapsedMilliseconds);
                     if (completed) writes++;
                     else break;
                 }

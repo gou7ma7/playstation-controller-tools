@@ -8,7 +8,7 @@ if (-not $OutputDirectory) { $OutputDirectory = Join-Path $moduleRoot 'dist' }
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if (-not (Test-Path -LiteralPath $compiler)) { throw 'The .NET Framework 4.x x64 C# compiler is required.' }
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
-$sources = @(Join-Path $moduleRoot 'src\SleepPolicy.cs'; Join-Path $moduleRoot 'src\NativeHid.cs'; Join-Path $moduleRoot 'src\Program.cs'; Join-Path $moduleRoot 'config\SleepLightConfig.cs')
+$sources = @(Join-Path $moduleRoot 'src\SleepPolicy.cs'; Join-Path $moduleRoot 'src\ControllerActivity.cs'; Join-Path $moduleRoot 'src\ControllerInput.cs'; Join-Path $moduleRoot 'src\NativeHid.cs'; Join-Path $moduleRoot 'src\Program.cs'; Join-Path $moduleRoot 'config\SleepLightConfig.cs')
 $defines = @()
 if ($Language -ne 'auto') { $defines = @('/define:UI_' + $Language.ToUpperInvariant()) }
 $references = @('/reference:System.Windows.Forms.dll','/reference:System.Drawing.dll','/reference:System.Web.Extensions.dll')

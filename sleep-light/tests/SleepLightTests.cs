@@ -8,6 +8,8 @@ namespace DS4SleepLight {
         private static readonly List<string> checks = new List<string>();
         private static void Check(string name, bool condition) { if (!condition) throw new Exception(name); checks.Add(name); }
         private static void Case(string name, Action body) { body(); checks.Add(name); }
+        private static byte[] NeutralReport() { byte[] report = new byte[64]; report[0] = 1; report[1] = report[2] = report[3] = report[4] = 128; report[5] = 8; return report; }
+        private static bool Activity(ControllerActivity detector, byte[] report) { bool activity; if (!detector.Observe(report, report.Length, out activity)) throw new Exception("Valid report rejected"); return activity; }
         internal static int Main(string[] args) {
             try {
                 SleepLightConfig.Validate();
@@ -51,6 +53,61 @@ namespace DS4SleepLight {
                 p.Suspend(); p.AutomaticResume(); Check("unlock-only resume supported", p.Unlock());
                 SleepPolicy noRestore = new SleepPolicy(false); noRestore.Suspend(); noRestore.AutomaticResume();
                 Check("restore disabled sends no color", !noRestore.UserResume() && noRestore.Phase == LightPhase.Ready);
+                ControllerActivity detector = new ControllerActivity(32, 12);
+                byte[] report = NeutralReport();
+                Check("first neutral input is only a baseline", !Activity(detector, report));
+                report[7] = 0xfc; report[10] = 91; report[13] = 255; report[20] = 7; report[30] = 1; report[35] = 49;
+                Check("counter sensors battery and touch motion ignored", !Activity(detector, report));
+                report[1] = 145; report[2] = 102; report[8] = 5; report[6] = 4;
+                Check("stick drift and tiny digital trigger noise ignored", !Activity(detector, report));
+                report[1] = 160; Check("deadzone boundary stays idle", !Activity(detector, report));
+                report[1] = 161; Check("stick movement past deadzone is activity", Activity(detector, report));
+                Check("held stick prevents false idle", Activity(detector, report));
+                report = NeutralReport(); Check("stick release resets inactivity clock", Activity(detector, report));
+                Check("neutral stream does not count as activity", !Activity(detector, report));
+                report[9] = 12; Check("right trigger threshold is activity", Activity(detector, report));
+                report = NeutralReport(); Activity(detector, report);
+                report[8] = 12; Check("left trigger threshold is activity", Activity(detector, report));
+                report = NeutralReport(); Activity(detector, report);
+                report[6] = 1; Check("shoulder press is activity", Activity(detector, report));
+                Check("held button remains activity", Activity(detector, report));
+                report[6] = 0; Check("button release is activity", Activity(detector, report));
+                report[5] = 0; Check("dpad direction is activity", Activity(detector, report));
+                report = NeutralReport(); Activity(detector, report); report[7] = 2;
+                Check("touchpad click is activity", Activity(detector, report));
+                report[7] = 1; Check("PS button is activity", Activity(detector, report));
+                report = NeutralReport(); Activity(detector, report); report[5] |= 0x20;
+                Check("face button is activity", Activity(detector, report));
+                bool observed; report = NeutralReport(); report[0] = 0x11;
+                Check("Bluetooth input format refused", !detector.Observe(report, 64, out observed));
+                report = NeutralReport(); Check("short input refused", !detector.Observe(report, 10, out observed));
+                report[5] = 15; Check("invalid dpad refused", !detector.Observe(report, 64, out observed));
+                IdleLightPolicy idle = new IdleLightPolicy(180000, 5000, 3000);
+                Check("no writes before input connection", idle.Next(500000) == IdleLightAction.None);
+                idle.Connected(1000); Check("startup baseline does not write a color", idle.Next(1000) == IdleLightAction.None);
+                Check("three minutes minus one millisecond remains lit", idle.Next(180999) == IdleLightAction.None);
+                Check("three minute deadline requests off", idle.Next(181000) == IdleLightAction.Off);
+                idle.Completed(IdleLightAction.Off, true, 181000);
+                Check("idle does not send off every timer tick", idle.Next(181100) == IdleLightAction.None);
+                Check("idle off refreshed at configured interval", idle.Next(186000) == IdleLightAction.Off);
+                idle.Completed(IdleLightAction.Off, true, 186000); idle.Activity(186001);
+                Check("real controller input requests configured color", idle.Next(186001) == IdleLightAction.Color);
+                idle.Completed(IdleLightAction.Color, false, 186001);
+                Check("busy output does not cause rapid retry", idle.Next(186002) == IdleLightAction.None);
+                Check("failed color write retried at interval", idle.Next(189001) == IdleLightAction.Color);
+                idle.Completed(IdleLightAction.Color, true, 189001);
+                Check("active use does not repeatedly override Steam color", idle.Next(200000) == IdleLightAction.None);
+                idle.Activity(300000); Check("activity extends inactivity deadline", idle.Next(400000) == IdleLightAction.None);
+                idle.Disconnected(); Check("disconnect prevents output", idle.Next(999999) == IdleLightAction.None);
+                idle.Suspend(); idle.Connected(1000000);
+                Check("resume baseline reasserts off rather than restoring color", idle.Next(1000000) == IdleLightAction.Off);
+                idle.Completed(IdleLightAction.Off, true, 1000000); idle.Activity(1000100);
+                Check("input after resume restores color", idle.Next(1000100) == IdleLightAction.Color);
+                idle.Suspend(); Check("suspend cancels pending color", idle.Next(1000200) == IdleLightAction.None);
+                SleepPolicy inputOnly = new SleepPolicy(false); inputOnly.Suspend(); inputOnly.Lock(); inputOnly.AutomaticResume(); inputOnly.UserResume();
+                Check("idle mode unlock cannot request a resume color", !inputOnly.Unlock() && inputOnly.Phase == LightPhase.Ready);
+                IdleLightPolicy oneOff = new IdleLightPolicy(180000, 0, 3000); oneOff.Connected(0); oneOff.Next(180000); oneOff.Completed(IdleLightAction.Off, true, 180000);
+                Check("zero refresh disables repeated idle off writes", oneOff.Next(900000) == IdleLightAction.None);
                 string logFolder = Path.Combine(Path.GetTempPath(), "DS4SleepLight-tests-" + Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(logFolder);
                 try {

@@ -4,11 +4,17 @@
 
 All settings are compiled from `config/SleepLightConfig.cs`; edit, exit the running watcher, rebuild, then restart it. No runtime configuration file or shared module is needed.
 
-- `RestoreOnResume`: default `true`. Restore the configured color after interactive resume/unlock. `false` leaves the light off until another application writes it.
+- `EnableIdleLight`: default `true`. Enable controller inactivity control. Resume/unlock alone does not restore color. Set `false` for the original sleep-only policy; the input reader is not started in that mode.
+- `IdleTimeoutSeconds`: `10..3600`, default `180`. Count from the first valid input baseline or last controller activity. Stationary reports, mouse and keyboard activity do not reset it. After reconnecting or a long UI gap, use a fresh baseline instead of queued old input.
+- `StickDeadzone`: `4..96`, default `32`. Per-axis distance from center 128; an axis outside this range counts as active while held. Inside it, small movement is ignored. Increase this for drift; too large a value delays recognition of gentle movement. Severe drift outside the deadzone can prevent idle off.
+- `TriggerThreshold`: `1..255`, default `12`. Analog L2/R2 at or above this counts as use. Their digital bits alone are ignored to avoid tiny trigger noise. Button/d-pad presses and releases count, as do PS and touchpad clicks; sensor data and touch coordinates do not.
+- `IdleOffRefreshMs`: `0` or `1000..60000`, default `5000`. Reassert off while idle and awake. `0` sends only the initial successful off. Lower values counter other light writers sooner but increase USB writes; nothing can run this during actual OS sleep. Color is never periodically reasserted during active use.
+- `IdleWriteRetryMs`: `500..10000`, default `3000`. Time between failed idle-mode output attempts. Reads must remain valid and fresh; a disconnect or ambiguous target prevents writes.
+- `RestoreOnResume`: default `true`, **only used when `EnableIdleLight = false`**. Restore after interactive resume/unlock. If `false`, sleep-only mode never restores color. It does not disable controller-triggered color in idle mode.
 - `Red`, `Green`, `Blue`: integers `0..255`; default `0,0,255`. For dim blue use `0,0,32`; for purple use `96,0,96`. These are raw RGB levels, not Steam's brightness slider. All-zero also keeps it dark after resume.
-- `RestoreDelayMs`: `0..10000`, default `1500`. Delay following interactive resume/unlock so USB can become available. Increasing it helps when the controller enumerates slowly.
-- `RestoreRetryWindowMs`: `500..30000`, default `5000`. Retry window after the initial delay. After expiry, wait for the next sleep cycle; no continuous writes.
-- `RestoreRetryIntervalMs`: `100..5000`, default `500`. Time between failed restore attempts. Success ends retries immediately.
+- `RestoreDelayMs`: `0..10000`, default `1500`. Sleep-only mode's delay after resume/unlock so USB can become available.
+- `RestoreRetryWindowMs`: `500..30000`, default `5000`. Sleep-only retry window after the delay. After expiry, wait for the next sleep cycle.
+- `RestoreRetryIntervalMs`: `100..5000`, default `500`. Sleep-only failed restoration retry interval. Success ends retries immediately.
 - `OffWriteAttempts`: `1..3`, default `2`. Brief repetitions during the suspend callback. This does not create a task that runs during sleep.
 - `OffRepeatDelayMs`: `0..100`, default `50`. Gap between those repeated off reports.
 - `UsbWriteTimeoutMs`: `50..500`, default `200`. Timeout before requesting cancellation of a pending write. The buffer and OVERLAPPED memory remain alive until the OS completes/cancels the operation; a faulty driver can delay cancellation, so this is not an absolute wall-clock bound.
@@ -29,7 +35,18 @@ powershell.exe -NoProfile -File .\scripts\build.ps1 -Language en
 
 The build validates ranges and runs synthetic checks for report fields, device capability filtering, duplicate notifications, deferred unlock restoration, pending-restore cancellation, and the S3 → automatic wake → S4 sequence. No native USB call is made by the test runner.
 
-For a real check, keep the watcher running and manually test S3 sleep and S4 hibernate separately. Observe both off and restored color, and open the active log from the tray. `suspend_off ... outcome=written` means Windows completed the reports, not that the visible result was independently measured. Background resumes should record `automatic_resume_no_light_write`; no restore should happen until user resume/unlock.
+It also checks USB input format rejection, noise filtering, held controls, the exact 180-second deadline, retries, controller-triggered restore and disconnect/suspend cancellation. The parser and idle policy are in `src/ControllerActivity.cs`; shared, overlapped `ReadFile` with cancellation is in `src/ControllerInput.cs`. See [Microsoft's HID input guidance](https://learn.microsoft.com/en-us/windows-hardware/drivers/hid/obtaining-hid-reports) and [Linux's DualShock 4 report layout](https://github.com/torvalds/linux/blob/master/drivers/hid/hid-playstation.c).
+
+Read-only input probe (no light reports):
+
+```powershell
+Start-Process .\dist\DS4SleepLight.exe -ArgumentList '--input-diagnose 3 dist/input-diagnostic.json' -WindowStyle Hidden -Wait
+Get-Content .\dist\input-diagnostic.json
+```
+
+This reports aggregate counts, never button values. For an actual idle test, leave the running watcher's controller untouched for three minutes, then use a button/stick. Mouse/keyboard operation should leave it dark. Repeat with Steam running. A successful off write alone does not measure the physical light color.
+
+For a real sleep check, manually test S3 and S4 separately. `suspend_off ... outcome=written` means Windows completed the reports, not that the visible result was measured. Background resumes should record `automatic_resume_no_light_write`. Idle mode waits for controller use to restore; sleep-only mode restores after user resume/unlock.
 
 ## Diagnostic log
 
@@ -42,6 +59,10 @@ Every record has UTC/local time, an ephemeral `run` ID, sequence, process/thread
 - `suspend_off_begin` / `suspend_off`: beginning/completion of the light-off operation, result and total duration.
 - `usb_operation_*`, `usb_enumeration_*`, `usb_write_attempt_*`: operation, target count, requested RGB, attempt result, Win32 error and duration. `usb_cancel_wait_*` brackets cancellation cleanup, which may be delayed by the driver.
 - `interactive_resume_restore_scheduled`, `resume_restore_*`: restore delay, RGB, write result, retry or completion. Background automatic resume still sends no restore color.
+- `input_status`, `input_connected_no_light_write`, `idle_input_baseline_no_light_write`, `idle_input_lost_no_light_write`: input access, fresh baseline and unavailable input. A baseline sends no color.
+- `idle_timeout_off`: off write result and inactivity duration. It also reasserts off after sleep/reconnect when the policy was already dark; an `idle_ms` below the timeout distinguishes that case.
+- `idle_controller_activity_restore_requested`, `idle_activity_color`: controller activity while dark, followed by configured color write. No raw input is recorded.
+- `idle_off_refresh`, `idle_input_heartbeat_no_light_write`: repeated off summary and total input reports. A high report count with increasing `idle_ms` is expected for a stationary controller. Heartbeats do not perform USB IO.
 - `heartbeat_no_usb_write`: one-minute UI-loop status. `ui_timer_gap` records wall-clock gaps over three seconds; sleep, UI blocking or clock changes can explain a gap. This is not an independent sleep detector and never sends USB commands.
 - `device_change_no_usb_write`: generic Windows device-change notification; it does not identify which device changed or poll USB.
 - `manual_test_begin` / `manual_test_completed`: actual requested test duration, separate from real suspend notifications. A command-line test has a separate run/process number.
