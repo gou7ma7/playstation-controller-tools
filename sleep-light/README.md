@@ -81,6 +81,8 @@ The repository's rumble reports enable only motors (`0x01`); this module enables
 
 Other software that also writes the lightbar, exclusive HID access, device removal during transition, or missing/delayed Windows power notifications may prevent a visible response. The program does not keep the computer awake, disconnect USB, change BIOS/power settings, remap buttons, read game data or read game memory. Physical behavior must be checked on your device; no guarantee is made solely from a successful write.
 
-The optional rotating local log is `%LOCALAPPDATA%\DS4SleepLight\events.log`, with UTC timestamps, action names, matching-device counts and write result/error numbers. It contains no device path, serial, account or game data. Diagnosis/test output files also omit those identifiers.
+The optional rotating log is `logs/events.log` beside the executable; if that folder is not writable, it falls back to `%LOCALAPPDATA%\DS4SleepLight\events.log`. The tray's **Open log** command opens the active file. It records UTC and local timestamps, a per-run ID and sequence, power/session notifications before and after handling, policy state, RGB commands, USB enumeration/write/cancellation durations, a one-minute heartbeat, and long UI timer gaps. Heartbeats and device-change records do not access USB or write lights. A log above 1 MiB rotates to `events.log.old`.
+
+These records help distinguish a missing/delayed notification from a failed or delayed USB write. They cannot read the actual light color, identify another application's light commands, or prove that a successful write stayed visible. Logs and diagnosis/test files omit device paths, serials, accounts and game data. See [log interpretation](docs/configuration.md#diagnostic-log).
 
 [Agent context](AGENTS.md) · [Agent prompts](prompts/agent.en.md) · [MIT license](LICENSE)

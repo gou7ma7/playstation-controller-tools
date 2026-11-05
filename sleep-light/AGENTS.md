@@ -10,6 +10,7 @@
 - Config: `config/SleepLightConfig.cs`; compile-time RGB default blue. Do not claim restoration of Steam's last color.
 - Build `scripts/build.ps1`; offline checks must not invoke HID or suspend the PC.
 - Native write completion is not proof of visible light or actual sleep behavior; describe verification accurately.
+- Diagnostic logs are best-effort and non-identifying. Preserve policy/report behavior; heartbeats/device-change logging must not poll USB or send lights. 日志不记录身份信息，不改变控制逻辑；运行状态和设备变更记录不轮询或写 USB。
 - Keep pinned data and unmanaged OVERLAPPED alive until pending/canceled IO completes.
 - Autostart is an optional current-user shortcut. Never silently install drivers or services for this module.
 - No device paths/serials, accounts, personal match data or local absolute paths in public files.

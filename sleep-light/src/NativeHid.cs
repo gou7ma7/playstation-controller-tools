@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
@@ -72,11 +73,23 @@ namespace DS4SleepLight {
             return paths;
         }
         private static SafeFileHandle Open(string path, uint access) { return CreateFile(path, access, 3, IntPtr.Zero, 3, 0x40000000, IntPtr.Zero); }
-        internal static WriteResult Diagnose() { return Execute(null, 0, 0); }
-        internal static WriteResult Send(byte[] report, int attempts, int repeatDelayMs) { return Execute(report, attempts, repeatDelayMs); }
+        internal static WriteResult Diagnose() { return RecordedExecute(null, 0, 0); }
+        internal static WriteResult Send(byte[] report, int attempts, int repeatDelayMs) { return RecordedExecute(report, attempts, repeatDelayMs); }
+        private static WriteResult RecordedExecute(byte[] report, int attempts, int repeatDelayMs) {
+            Stopwatch duration = Stopwatch.StartNew();
+            string operation = report == null ? "diagnose" : "light";
+            string rgb = report != null && report.Length >= 9 ? report[6] + "," + report[7] + "," + report[8] : "none";
+            Log.Event("usb_operation_begin", "operation=" + operation + " attempts=" + attempts + " gap_ms=" + repeatDelayMs + " rgb=" + rgb);
+            WriteResult result = null;
+            try { result = Execute(report, attempts, repeatDelayMs); return result; }
+            finally { Log.Write("usb_operation_completed", result, "operation=" + operation + " duration_ms=" + duration.ElapsedMilliseconds); }
+        }
         private static WriteResult Execute(byte[] report, int attempts, int repeatDelayMs) {
             List<string> paths;
+            Stopwatch enumeration = Stopwatch.StartNew();
+            Log.Event("usb_enumeration_begin", "");
             try { paths = Paths(); } catch (IOException) { return new WriteResult("enumeration_failed", 0, 0, Marshal.GetLastWin32Error()); }
+            Log.Event("usb_enumeration_completed", "matches=" + paths.Count + " duration_ms=" + enumeration.ElapsedMilliseconds);
             if (paths.Count != 1) return new WriteResult(paths.Count == 0 ? "no_supported_device" : "multiple_devices_refused", paths.Count, 0, 0);
             using (SafeFileHandle file = Open(paths[0], 0x40000000)) {
                 if (file.IsInvalid) return new WriteResult("output_unavailable", 1, 0, Marshal.GetLastWin32Error());
@@ -84,7 +97,11 @@ namespace DS4SleepLight {
                 int writes = 0, error = 0;
                 for (int i = 0; i < attempts; i++) {
                     if (i > 0) System.Threading.Thread.Sleep(repeatDelayMs);
-                    if (Write(file, report, out error)) writes++;
+                    Log.Event("usb_write_attempt_begin", "attempt=" + (i + 1));
+                    Stopwatch attemptDuration = Stopwatch.StartNew();
+                    bool completed = Write(file, report, out error);
+                    Log.Event("usb_write_attempt_completed", "attempt=" + (i + 1) + " success=" + completed + " win32=" + error + " duration_ms=" + attemptDuration.ElapsedMilliseconds);
+                    if (completed) writes++;
                     else break;
                 }
                 return new WriteResult(writes == attempts ? "written" : "write_failed", 1, writes, error);
@@ -115,7 +132,15 @@ namespace DS4SleepLight {
                 } finally {
                     // Keep the unmanaged OVERLAPPED and pinned buffer alive until canceled IO completes.
                     // 取消后等待 IO 完成，才释放 OVERLAPPED 与缓冲区。
-                    if (pending) { uint ignored; CancelIoEx(file, ov); GetOverlappedResult(file, ov, out ignored, true); }
+                    if (pending) {
+                        uint ignored;
+                        Log.Event("usb_cancel_wait_begin", "write_win32=" + error);
+                        Stopwatch cancellation = Stopwatch.StartNew();
+                        CancelIoEx(file, ov);
+                        bool completed = GetOverlappedResult(file, ov, out ignored, true);
+                        int cancelError = completed ? 0 : Marshal.GetLastWin32Error();
+                        Log.Event("usb_cancel_wait_completed", "completed=" + completed + " win32=" + cancelError + " duration_ms=" + cancellation.ElapsedMilliseconds);
+                    }
                     Marshal.FreeHGlobal(ov); buffer.Free();
                 }
             }

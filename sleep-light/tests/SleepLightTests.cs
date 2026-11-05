@@ -51,6 +51,23 @@ namespace DS4SleepLight {
                 p.Suspend(); p.AutomaticResume(); Check("unlock-only resume supported", p.Unlock());
                 SleepPolicy noRestore = new SleepPolicy(false); noRestore.Suspend(); noRestore.AutomaticResume();
                 Check("restore disabled sends no color", !noRestore.UserResume() && noRestore.Phase == LightPhase.Ready);
+                string logFolder = Path.Combine(Path.GetTempPath(), "DS4SleepLight-tests-" + Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(logFolder);
+                try {
+                    string blocked = Path.Combine(logFolder, "blocked"); File.WriteAllText(blocked, "a file cannot be a log directory");
+                    Check("unwritable log directory is nonfatal", !Log.TryAppend(blocked, "test\n"));
+                    string writable = Path.Combine(logFolder, "fallback");
+                    Check("log can continue in a writable fallback", Log.TryAppend(writable, "fallback\n"));
+                    string file = Path.Combine(writable, "events.log");
+                    using (FileStream large = File.Open(file, FileMode.Open, FileAccess.Write)) large.SetLength(Log.MaximumBytes + 1);
+                    Check("oversized log rotates successfully", Log.TryAppend(writable, "after rotation\n"));
+                    Check("rotation keeps previous log", File.Exists(file + ".old"));
+                    Check("rotation starts a small active log", File.ReadAllText(file) == "after rotation\n");
+                } finally {
+                    // Delete only this freshly created, validated test directory.
+                    string full = Path.GetFullPath(logFolder), temp = Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                    if (full.StartsWith(temp, StringComparison.OrdinalIgnoreCase) && Path.GetFileName(full).StartsWith("DS4SleepLight-tests-", StringComparison.Ordinal)) Directory.Delete(full, true);
+                }
                 string json = new JavaScriptSerializer().Serialize(new { passed = checks.Count, hardwareWrites = 0, checks = checks });
                 if (args.Length == 1) File.WriteAllText(args[0], json);
                 Console.WriteLine("PASS: " + checks.Count + " offline checks; no USB operations."); return 0;

@@ -81,6 +81,8 @@ Get-Content .\sleep-light\dist\cycle-result.json
 
 其他软件也写灯色、独占 HID、设备在转换时掉线、Windows 电源通知缺失/延迟，都可能影响实际效果。程序不阻止电脑睡眠，不断开 USB，不修改 BIOS/电源设置，不映射按键，不读取游戏数据或游戏内存。实际手柄行为需要自行观察，不能只凭写入成功保证有效。
 
-可选的轮换本地日志位于 `%LOCALAPPDATA%\DS4SleepLight\events.log`，记录 UTC 时间、操作名称、匹配设备数及写入结果/错误编号；不包含设备路径、序列号、账号或游戏数据。诊断和测试文件也不包含这些标识。
+可选轮换日志优先写入 EXE 旁的 `logs/events.log`；程序目录不可写时，回退到 `%LOCALAPPDATA%\DS4SleepLight\events.log`。托盘的 **打开日志** 可直接打开当前文件。记录 UTC 和本地时间、本次运行编号与顺序、睡眠及锁屏通知收到/处理的先后、状态机、发送的 RGB、USB 枚举/写入/取消等待耗时、每分钟运行状态，以及较长的界面定时器间隔。运行状态和设备变更记录不访问 USB、不写灯。日志超过 1 MiB 时轮换到 `events.log.old`。
+
+这些记录用于区分通知未到达/延迟与 USB 写入失败/延迟，不能读取实际灯色、识别其他软件的灯光指令，也不能证明写入成功后灯色没有被覆盖。日志、诊断和测试文件不包含设备路径、序列号、账号或游戏数据。详见 [日志解读](docs/configuration.zh-CN.md#日志诊断)。
 
 [Agent 说明](AGENTS.md) · [Agent Prompt](prompts/agent.zh-CN.md) · [MIT 许可证](LICENSE)
