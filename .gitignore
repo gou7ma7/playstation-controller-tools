@@ -2,6 +2,10 @@
 *.log
 *.log.1
 lol-integration.json
+input-remap.json
+input-host.json
+input-host.json.tmp
+input-status.json
 *.jsonl
 diagnostics.json
 runtime-status.json

@@ -10,7 +10,7 @@
 Three independent modules for a Windows controller setup:
 
 - **[mapping/](mapping/README.md)**: LoL left-hand controller + right-hand mouse controls, a native DS4 Steam Input VDF, WASD game settings and champion-specific notes. DualSense users can recreate the documented controls manually. No rumble dependency.
-- **[rumble/](rumble/README.md)**: Windows USB DS4 v2 / DualSense compatible rumble feedback based on the local Live Client Data API. It works without this Steam layout and does not require WASD movement or Steam. [Optional foreground integration](rumble/docs/integration.md) can share its tray/login startup with Steam layout selection and a LoL-only DualSense trigger-resistance reset.
+- **[rumble/](rumble/README.md)**: Windows USB DS4 v2 / DualSense rumble feedback from the local Live Client API. Optional [foreground integration](rumble/docs/integration.md) and [Space as right Ctrl](rumble/docs/input-remap.md) share one LoL exe/tray/login entry; keyboard handling is isolated from the ordinary USB process. Rumble itself needs neither this layout nor Steam.
 - **[sleep-light/](sleep-light/README.md)**: turn off USB DS4 v2 or DualSense lights after three minutes of controller inactivity and restore configured blue on controller input. Also sends off before sleep/hibernate; resume/unlock alone does not relight in default idle mode. No Steam or game dependency.
 
 Use any module separately or together. None installs or changes another.

@@ -58,11 +58,15 @@ Start-Process -FilePath .\dist\LoLDamageRumble.exe -ArgumentList '--diagnose', '
 Get-Content .\diagnostics.json
 ```
 
-It checks the local API and ability to open the controller output handle without sending motor commands. `--status-file <path>` writes a version 5 status snapshot with API availability, controller model/connection/error, supported device count, feedback counts and successful motor-report writes. `pulsesWritten` is the legacy pattern-start counter; `motorReportsWritten` counts completed USB writes, including stops. Reports contain no HID path, controller serial or player identity. Optional integration fields record foreground/layout state and trigger reset counts. `--test <path>` really sends a short 150 ms motor pulse and stops it; use the tray for normal pattern testing.
+It checks the local API and ability to open the controller output handle without sending motor commands. `--status-file <path>` writes a version 6 status snapshot with API availability, controller model/connection/error, supported device count, feedback counts and successful motor-report writes. `pulsesWritten` is the legacy pattern-start counter; `motorReportsWritten` counts completed USB writes, including stops. Reports contain no HID path, controller serial or player identity. Optional fields record foreground/layout state, trigger resets and input-remap enable/error state. `--test <path>` really sends a short 150 ms motor pulse and stops it; use the tray for normal pattern testing.
 
 ## Optional shared tray for LoL mapping
 
 [Configure foreground integration](docs/integration.md) to select a local saved Steam layout and clear inherited USB DualSense trigger resistance only while the match is foreground. This is disabled unless configured; standalone rumble still works without Steam. Keep Steam elevated for the documented LoL mapping. Switching away restores automatic layout selection and stops trigger writes; other games/tools must reapply their own effects.
+
+## Optional Space as right Ctrl in the same exe
+
+[Space remapping](docs/input-remap.md) lets user-operated clicks and skill keys inherit Ctrl behavior only in the actual foreground LoL process. The ordinary tray/HID process has no keyboard hook; an isolated worker uses the same executable and releases owned Ctrl on leaving scope. Default off, with a separate local config and reviewed on-demand task for elevated input. No separate click application or login entry is required.
 
 ## Agent and references
 

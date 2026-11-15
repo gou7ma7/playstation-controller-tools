@@ -35,7 +35,7 @@ The following desktop-layout method is the original manual setup. A desktop layo
 
 ## Champion and interaction notes
 
-Riot now exposes separate WASD selection, interaction, attack and cast bindings. Check those native options before adding an operating-system remapper. [Interaction research](docs/interaction-research.md) explains the remaining uncertainty around Space + left click; no Space-to-Ctrl conversion is included.
+Riot now exposes separate WASD selection, interaction, attack and cast bindings. Check those native options before adding an operating-system remapper. Optional **[Space as right Ctrl](../rumble/docs/input-remap.md)** uses the shared LoL exe with an isolated input worker, enabling Ctrl+click and Ctrl+skill keys only in the actual foreground game. It does not change the Steam layout. [Interaction research](docs/interaction-research.md) explains native binding limitations and physical verification status.
 
 For sustained/channelled R, D-pad down can avoid accidentally moving the left stick while pressing L3. The exported layout emits **3** there, so set that champion's R to 3 in the game. Passive-E champions such as Teemo/Twisted Fate, or champions using Q/W very frequently, can use a per-champion right-button swap. Some interactions, including Frost Gates and destination selection, need **Ctrl + left click** in the user's setup. These are manual notes, not automatic code; see [usage notes](docs/usage-notes.md).
 

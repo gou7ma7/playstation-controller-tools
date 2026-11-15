@@ -13,6 +13,7 @@ if (-not (Test-Path -LiteralPath $compiler)) {
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 $source = Join-Path $moduleRoot 'src\LoLDamageRumble.cs'
 $integration = Join-Path $moduleRoot 'src\LoLIntegration.cs'
+$inputRemap = Join-Path $moduleRoot 'src\LoLInputRemap.cs'
 $config = Join-Path $moduleRoot 'config\FeedbackConfig.cs'
 $tests = Join-Path $moduleRoot 'tests\LoLRumbleTests.cs'
 $regression = Join-Path $moduleRoot 'tests\RegressionSettings.cs'
@@ -24,7 +25,7 @@ if ($Preset -ne 'default') { $symbols += 'PRESET_' + $Preset.ToUpperInvariant() 
 if ($Language -ne 'auto') { $symbols += 'UI_' + $Language.ToUpperInvariant() }
 $defineArgument = @()
 if ($symbols.Count) { $defineArgument = @('/define:' + ($symbols -join ',')) }
-& $compiler /nologo /target:exe /platform:x64 /main:LoLDamageRumble.Tests "/out:$runner" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll @defineArgument $source $integration $config $tests $regression
+& $compiler /nologo /target:exe /platform:x64 /main:LoLDamageRumble.Tests "/out:$runner" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll @defineArgument $source $integration $inputRemap $config $tests $regression
 if ($LASTEXITCODE -ne 0) { throw "Test compilation failed ($LASTEXITCODE)." }
 & $runner $report $fixture $Preset $Language
 if ($LASTEXITCODE -ne 0) { throw "Behavior tests failed ($LASTEXITCODE)." }

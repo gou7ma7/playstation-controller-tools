@@ -11,7 +11,7 @@
 
 先解释现有有效绑定，再完成我的需求。保留 VDF 重复键和未启用组的语义，不把模板显示标签当作游戏动作。方向键下是 3；持续 R、单英雄右键替换和 Ctrl+左键交互是使用备注，不应擅自加入自动逻辑。
 
-仅 LoL 前台启用时读取 rumble/docs/integration.zh-CN.md：可选选择器使用本机保存的 Steam 布局，不修改桌面绑定。提出空格＋左键方案前读取 docs/interaction-research.zh-CN.md，优先原生 WASD 动作；空格作为修饰符尚未验证。仅调研的请求不能擅自增加输入钩子。
+仅 LoL 前台启用时读取 rumble/docs/integration.zh-CN.md：可选选择器使用本机保存的 Steam 布局，不修改桌面绑定。空格作为右 Ctrl 读取 docs/interaction-research.zh-CN.md 和 rumble/docs/input-remap.zh-CN.md。它使用同一个 LoL exe 的隔离键盘工作进程，普通 USB/托盘进程没有键盘钩子；保留物理 Ctrl 归属，离开前台就释放自己按住的 Ctrl，不区分聊天，也不得给 PowerToys 提权。仅调研不能擅自安装钩子或按需工作任务。
 
 修改只写入仓库，提供可检查的文件和手动应用步骤；同步中英文文档，不上传账号标识或整份个人配置。只有任务明确要求时才安装布局或修改我的 Steam/游戏设置。
 

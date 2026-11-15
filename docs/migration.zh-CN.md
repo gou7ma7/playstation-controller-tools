@@ -25,6 +25,6 @@ GitHub 会重定向旧 `lol-ds4-steam-input` 链接。历史 v0.1.0 附件保留
 
 ## 按模块说明设备支持
 
-ControllerLight 支持 USB DS4 第二代与 DualSense；LoL 振动仍仅支持 USB DS4 第二代；映射 VDF 仍是 DS4 导出，DualSense 可手动重建核心操作。更名不代表已经加入蓝牙、DualSense Edge、原生 PS5 游戏反馈或已验证的 DualSense VDF 支持。
+ControllerLight 和当前 LoL 振动均支持 USB DS4 第二代与 DualSense；映射 VDF 仍是 DS4 导出，DualSense 可手动重建核心操作。更名不代表已经加入蓝牙、DualSense Edge、原生 PS5 游戏反馈或已验证的 DualSense VDF 支持。可选空格修饰键已集中到同一个 LoL exe，见 [输入模块](../rumble/docs/input-remap.zh-CN.md)。
 
 仍建议先检查源码再自行编译；Windows 完全睡眠时无法执行周期灭灯刷新。

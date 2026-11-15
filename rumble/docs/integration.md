@@ -40,7 +40,7 @@ Sources: [DSX developer release notes](https://steamcommunity.com/app/1812620/al
 
 ## Diagnostics
 
-Use `--status-file <path>` for UTF-8 version 5 status. Added fields include `steamInputEnabled`, `steamInputSelectedAppId` (`0` means automatic), `lolWindowForeground`, `triggerResetEnabled`, `triggerResetsWritten` (completed clear reports), and `integrationError`. `motorReportsWritten` continues to count only ordinary vibration reports including stops. `integration.log` records transitions/errors; it rotates at 512 KiB to one older file. No player identity or HID serial/path is recorded.
+Use `--status-file <path>` for UTF-8 version 6 status. Fields include `steamInputEnabled`, `steamInputSelectedAppId` (`0` means automatic), `lolWindowForeground`, `triggerResetEnabled`, `triggerResetsWritten` (completed clear reports), and `integrationError`. Optional input enable/error fields are separate; see [Space remapping](input-remap.md). `motorReportsWritten` counts only ordinary vibration reports including stops. `integration.log` records transitions/errors; it rotates at 512 KiB to one older file. No player identity or HID serial/path is recorded.
 
 For an explicitly requested one-time reset, `--reset-triggers <report.json>` clears both USB DualSense triggers without starting the tray app. It changes the device immediately; it does not need the game to be foreground. Build/offline tests do not send this command.
 

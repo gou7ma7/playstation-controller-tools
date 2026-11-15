@@ -35,6 +35,7 @@ namespace LoLDamageRumble {
         private static void Run(string[] args) {
             ProtocolTests();
             IntegrationTests();
+            InputRemapTests();
             FeedbackDetector detector=new FeedbackDetector(defaults.Detection);
             Check(detector.Player(P(1000,100),0).Count==0,"startup establishes baseline");
             Check(detector.Player(P(990,100),.1).Count==0,"small damage is silent");
@@ -213,6 +214,63 @@ namespace LoLDamageRumble {
                 Check(isolated,kind+" light, player LED, trigger, audio and microphone fields remain disabled");
             }
             Reject(delegate { MotorReport.Make(ControllerKind.None,255,255); },"unknown motor protocol cannot emit a report");
+        }
+        private static void InputRemapTests() {
+            SpaceCtrlPolicy p=new SpaceCtrlPolicy();
+            KeyDecision k=p.Key(0x20,true,false,false);
+            Check(!k.Swallow && k.Action==CtrlAction.None,"desktop Space remains native");
+            k=p.Key(0x20,true,false,true);
+            Check(!k.Swallow && k.Action==CtrlAction.None,"holding desktop Space while entering LoL does not synthesize Ctrl");
+            p.Key(0x20,false,false,true);
+            k=p.Key(0x20,true,false,true);
+            Check(k.Swallow && k.Action==CtrlAction.Down && p.OwnCtrl,"foreground Space presses right Ctrl");
+            k=p.Key(0x45,true,false,true);
+            Check(!k.Swallow && k.Action==CtrlAction.None && p.Active,"skill key passes while Ctrl is held");
+            k=p.Key(0x20,true,false,true);
+            Check(k.Swallow && k.Action==CtrlAction.None,"Space repeat does not repeat Ctrl down");
+            k=p.Key(0xA3,true,true,true);
+            Check(!k.Swallow && !p.PhysicalCtrl,"injected Ctrl is never treated as a physical owner");
+            Check(p.Release()==CtrlAction.Up && !p.Active && !p.OwnCtrl,"leaving foreground releases only owned Ctrl");
+            k=p.Key(0x20,false,false,false);
+            Check(k.Swallow && k.Action==CtrlAction.None,"matching Space up is consumed after switching away");
+            Check(p.Release()==CtrlAction.None,"repeated cleanup emits no extra Ctrl up");
+            p.Key(0xA3,true,false,true);
+            k=p.Key(0x20,true,false,true);
+            Check(k.Swallow && k.Action==CtrlAction.None && !p.OwnCtrl,"user-held right Ctrl is reused");
+            k=p.Key(0x20,false,false,true);
+            Check(k.Swallow && k.Action==CtrlAction.None && p.PhysicalCtrl,"Space release preserves user's right Ctrl");
+            p.Key(0xA3,false,false,true);
+            p.Key(0x20,true,false,true);
+            p.Key(0xA3,true,false,true);
+            k=p.Key(0x20,false,false,true);
+            Check(k.Action==CtrlAction.None && p.PhysicalCtrl,"physical Ctrl pressed during Space stays down");
+            p.Key(0xA3,false,false,true);
+            p.Key(0xA3,true,false,true);
+            p.Key(0x20,true,false,true);
+            k=p.Key(0xA3,false,false,true);
+            Check(k.Swallow && p.OwnCtrl,"physical Ctrl released first transfers ownership to Space");
+            k=p.Key(0x20,false,false,true);
+            Check(k.Action==CtrlAction.Up && !p.OwnCtrl,"last Space release releases transferred Ctrl");
+            k=p.Key(0xA2,true,false,true);
+            Check(!k.Swallow && k.Action==CtrlAction.None,"left Ctrl mappings remain untouched");
+            k=p.Key(0xA4,true,false,true);
+            Check(!k.Swallow && k.Action==CtrlAction.None,"left Alt mappings remain untouched");
+            p.Key(0x20,true,false,true);
+            k=p.Key(0x20,false,false,true);
+            Check(k.Action==CtrlAction.Up && !p.SpaceDown,"normal Space release clears modifier");
+            p.Key(0x20,true,false,true);
+            p.InjectionFailed(CtrlAction.Down);
+            Check(!p.OwnCtrl && !p.Active,"blocked Ctrl down creates no ownership");
+            Check(p.Key(0x20,false,false,true).Action==CtrlAction.None,"failed Ctrl down needs no release");
+            p.Key(0x20,true,false,true);
+            p.Key(0x20,false,false,true);
+            p.InjectionFailed(CtrlAction.Up);
+            Check(p.Release()==CtrlAction.Up,"failed Ctrl up remains retryable");
+            Check(System.Runtime.InteropServices.Marshal.SizeOf(typeof(InputNative.Input))==40,"input worker uses Windows x64 INPUT size");
+            InputNative.Input d=InputNative.Ctrl(CtrlAction.Down), u=InputNative.Ctrl(CtrlAction.Up);
+            Check(d.Type==1 && d.Data.Keyboard.Key==0xA3 && d.Data.Keyboard.Scan==0x1D && d.Data.Keyboard.Flags==1,"worker sends specifically right Ctrl down");
+            Check(u.Type==1 && u.Data.Keyboard.Key==0xA3 && u.Data.Keyboard.Flags==3,"worker sends specifically right Ctrl up");
+            Check(d.Data.Keyboard.Extra==InputNative.Marker && u.Data.Keyboard.Extra==InputNative.Marker,"worker input is marked against recursion");
         }
         private static void IntegrationTests() {
             LoLIntegrationSettings disabled=LoLIntegrationSettings.Parse("{}");

@@ -25,6 +25,6 @@ GitHub redirects the former `lol-ds4-steam-input` URL. Historical v0.1.0 attachm
 
 ## Module-specific device support
 
-ControllerLight supports USB DS4 v2 and DualSense. LoL rumble remains USB DS4 v2 only. The native mapping VDF remains a DS4 export; DualSense users can manually recreate the core controls. Renaming adds no Bluetooth, DualSense Edge, native DualSense game-feedback or verified DualSense VDF support.
+ControllerLight and current LoL rumble support USB DS4 v2 and DualSense. The native mapping VDF remains a DS4 export; DualSense users can manually recreate the core controls. Renaming adds no Bluetooth, DualSense Edge, native DualSense game-feedback or verified DualSense VDF support. Optional Space remapping now uses the same LoL exe; see [input remapping](../rumble/docs/input-remap.md).
 
 Review the source and build yourself before running a binary. Windows still cannot run periodic light-off refreshes while asleep.

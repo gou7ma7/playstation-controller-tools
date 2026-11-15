@@ -1,4 +1,4 @@
-# WASD 物体交互：调研，不是已安装的转换功能
+# WASD 物体交互与空格修饰键
 
 [English](interaction-research.md)
 
@@ -8,6 +8,6 @@ Riot 在 2026 年 4 月的[输入系统更新说明](https://www.leagueoflegends
 
 优先在 LoL 内绑定所需动作。如果当前客户端支持，且使用者接受，可以考虑按空格直接在鼠标所在位置交互。精确的 **按住空格＋点击左键** 尚未验证：官方允许绑定普通键，不代表普通键能作为组合键修饰符。不要直接把 `[Space][Button 1]` 写入整份保存配置并假定有效。任何实际改动都应备份相关绑定，并在训练模式验证。
 
-原生绑定表达不了这个组合时，才考虑独立、可选、仅 LoL 前台生效的转换：一次物理组合对应一次 Ctrl＋左键。它需要处理聊天、修饰键归属、两种松键顺序、切出窗口、锁屏/休眠、退出与进程权限差异，不能释放使用者自己按住的 Ctrl，也不能把模拟 Ctrl 留在游戏外。这些是设计要求，不是已实现功能的保证。Windows [SendInput](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput)受进程完整性级别限制。
+社区存在修改隐藏 `ModifierEvents` 的做法，但[近期使用者报告新版失效](https://www.reddit.com/r/leagueoflegends/comments/1xuo4kj/modifierevents_keybind_changes_in/)，不能视为稳定原生方案。
 
-振动程序没有提供键盘或鼠标转换。Steam 手柄映射、PowerToys 键盘交换与这个可能的后续功能各自独立；先验证游戏原生绑定，再考虑增加输入钩子。
+当前可选 [空格作为右 Ctrl](../../rumble/docs/input-remap.zh-CN.md) 使用同一个 LoL exe 的隔离输入工作进程，仅实际对局前台转换空格按下/松开；鼠标和技能键仍由使用者操作。使用者已确认空格＋左键、技能升级及松开后输入正常，不区分游戏聊天/菜单；其他电脑和版本需自行验证。普通 USB/托盘进程没有键盘钩子，不改 Steam 或 PowerToys 设置。Windows [SendInput](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput)仍受权限限制；修饰键归属、切出释放、按需任务和退出方法见输入模块说明。它替代旧版独立四事件点击工具；仅调研不代表允许安装此功能。

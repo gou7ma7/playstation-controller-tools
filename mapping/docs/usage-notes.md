@@ -20,4 +20,4 @@ Global defaults remain L2→Q, L1→W, Mouse right→E, L3→R. No automatic swa
 
 In the user's actual setup, some interactions that normally involve clicking an object, including Frost Gates and then choosing a destination, require **Ctrl + left mouse button**.
 
-Try that combination for similar target/confirmation interactions. This records the user's experience in this WASD setup, not a guarantee for every game version/mode or interaction. The project does not automatically send Ctrl/clicks or select a destination.
+Try that combination for similar target/confirmation interactions. This records the user's experience in this WASD setup, not a guarantee for every game version/mode or interaction. Optional [Space as right Ctrl](../../rumble/docs/input-remap.md) uses the shared LoL exe only in the actual foreground game. The user still clicks targets, chooses destinations and presses skill keys; the Steam layout does not perform these actions automatically.

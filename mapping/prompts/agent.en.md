@@ -11,7 +11,7 @@ Required startup for this setup: completely exit Steam, then use Run as administ
 
 Explain the current active bindings before implementing my request. Preserve repeated KeyValues entries and inactive-group semantics; old template labels are not game actions. D-pad down emits 3. Sustained R, per-champion right-button swaps and Ctrl+left-click interaction are manual usage notes, not automatic behavior.
 
-For LoL-only activation, read rumble/docs/integration.md: an optional foreground selector uses a local saved Steam layout without changing desktop bindings. Read docs/interaction-research.md before proposing Space + click; native WASD actions are preferable and Space as a modifier is unverified. Do not add an input hook for a research-only request.
+For LoL-only activation, read rumble/docs/integration.md: an optional foreground selector uses a local saved Steam layout without changing desktop bindings. Read docs/interaction-research.md and rumble/docs/input-remap.md for optional Space-as-right-Ctrl. It uses an isolated keyboard worker of the same LoL exe, with no keyboard hook in the ordinary HID/tray process. Preserve physical Ctrl ownership, release owned Ctrl on leaving scope, and do not elevate PowerToys. No chat detection. Do not install hooks or worker tasks for a research-only request.
 
 Make reviewable repository changes and provide manual application steps. Update both languages and exclude account IDs/full personal configs. Install layouts or change my Steam/game settings only when my task explicitly asks for it.
 

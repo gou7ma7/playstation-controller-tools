@@ -58,11 +58,15 @@ Start-Process -FilePath .\dist\LoLDamageRumble.exe -ArgumentList '--diagnose', '
 Get-Content .\diagnostics.json
 ```
 
-诊断检查接口和手柄输出句柄，不发送振动。`--status-file <路径>` 定期写版本 5 状态快照，含接口可用性、手柄型号/连接/错误、支持设备数量、反馈计数和成功马达报告写入次数。`pulsesWritten` 保留旧版含义，统计开始播放的节奏；`motorReportsWritten` 统计完成的 USB 写入，含停转。报告不含 HID 路径、手柄序列号或玩家身份；可选整合字段另记录前台/布局状态及扳机清除计数；`--test <路径>` 会真的短震 150 毫秒并停转。日常模式测试建议用托盘。
+诊断检查接口和手柄输出句柄，不发送振动。`--status-file <路径>` 定期写版本 6 状态快照，含接口可用性、手柄型号/连接/错误、支持设备数量、反馈计数和成功马达报告写入次数。`pulsesWritten` 保留旧版含义，统计开始播放的节奏；`motorReportsWritten` 统计完成的 USB 写入，含停转。报告不含 HID 路径、手柄序列号或玩家身份；可选字段另记录前台/布局、扳机清除计数和输入模块开关/错误；`--test <路径>` 会真的短震 150 毫秒并停转。日常模式测试建议用托盘。
 
 ## 与 LoL 映射共用托盘（可选）
 
 按 [前台整合说明](docs/integration.zh-CN.md) 配置，可在实际对局前台时选中本机已保存的 Steam 布局，并清除 USB DualSense 遗留扳机阻力。未配置时默认关闭，振动仍独立于 Steam。使用文档中的 LoL 映射需以管理员身份运行 Steam。切走后恢复自动选布局并停止扳机写入，其他游戏/工具需重新应用自己的效果。整合源码是 [LoLIntegration.cs](src/LoLIntegration.cs)。
+
+## 同一个 exe 的空格修饰键（可选）
+
+[空格作为右 Ctrl](docs/input-remap.zh-CN.md) 仅在实际 LoL 前台让使用者自己的点击与技能键继承 Ctrl 行为。普通 USB/托盘进程没有键盘钩子；隔离工作进程使用同一个 exe，并在离开前台时释放自己按住的 Ctrl。默认关闭，使用独立本机配置和经检查的按需提权任务，不再需要独立点击程序或登录入口。
 
 ## Agent 与参考
 

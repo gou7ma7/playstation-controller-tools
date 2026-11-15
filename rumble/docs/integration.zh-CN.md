@@ -40,7 +40,7 @@ DSX 3.1 支持在 Installed Games 中为游戏关联配置，官方更新也说�
 
 ## 诊断
 
-`--status-file <路径>` 写 UTF-8 版本 5 状态。新增字段：`steamInputEnabled`、`steamInputSelectedAppId`（`0` 表示自动）、`lolWindowForeground`、`triggerResetEnabled`、`triggerResetsWritten`（完成的清除报告）及 `integrationError`。`motorReportsWritten` 仍只统计普通振动报告，含停转。`integration.log` 记录切换与错误，达到 512 KiB 轮换并保留一份旧日志，不记录玩家身份或 HID 序列号/路径。
+`--status-file <路径>` 写 UTF-8 版本 6 状态，含 `steamInputEnabled`、`steamInputSelectedAppId`（`0` 表示自动）、`lolWindowForeground`、`triggerResetEnabled`、`triggerResetsWritten`（完成的清除报告）及 `integrationError`。输入模块开关/错误另记录，见 [空格修饰键](input-remap.zh-CN.md)。`motorReportsWritten` 只统计普通振动报告，含停转。`integration.log` 记录切换与错误，达到 512 KiB 轮换并保留一份旧日志，不记录玩家身份或 HID 序列号/路径。
 
 明确需要单次清除时可用 `--reset-triggers <report.json>`，立即清除 USB DualSense 双扳机而不启动托盘。此命令直接改变硬件，不要求游戏前台；构建及离线测试不会发送它。
 

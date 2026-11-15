@@ -1,4 +1,4 @@
-# WASD object interaction: research, not an installed remapper
+# WASD object interaction and Space modifier
 
 [简体中文](interaction-research.zh-CN.md)
 
@@ -8,6 +8,6 @@ First inspect **Keyboard (WASD) → Casting and Interaction** in the running gam
 
 Prefer binding the required actions inside LoL. Space alone at the mouse cursor may be a useful alternative if the player accepts it and the current client supports that binding. Exact **hold Space + click left** support is unverified: the official ability to bind keyboard keys does not establish that an ordinary key can act as a chord modifier. Do not insert `[Space][Button 1]` into an entire saved configuration and assume it works. Back up relevant bindings and verify in practice mode before applying any change.
 
-If native binding cannot express the requested combination, a separate optional LoL-only remapper could translate one physical combination to one Ctrl + click. It would need to handle chat, modifier ownership, both release orders, focus loss, lock/suspend, exit and process-privilege differences. It must never release a Ctrl held by the user or leave an injected Ctrl down outside the game. Those are design requirements, not guarantees of an implemented feature. Windows [SendInput](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput) is subject to process-integrity restrictions.
+Community hidden `ModifierEvents` edits exist, but a [recent user reported failure after an update](https://www.reddit.com/r/leagueoflegends/comments/1xuo4kj/modifierevents_keybind_changes_in/). This does not establish a reliable native solution.
 
-No keyboard/mouse conversion is shipped in the rumble program. Steam controller mapping, PowerToys keyboard swaps and this possible future feature are distinct concerns. Investigate native bindings before adding another input hook.
+The current optional [Space as right Ctrl](../../rumble/docs/input-remap.md) uses an isolated worker of the shared LoL exe. Only in the actual foreground match does Space down/up become right Ctrl; mouse and skills remain user-operated. The user confirmed Space+click, skill leveling and normal input after release in practice mode. No chat/menu detection; other PCs and versions still need testing. The ordinary USB/tray process has no keyboard hook, and Steam/PowerToys settings are unchanged. Windows [SendInput](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput) integrity limits apply. See the input guide for ownership, scope exit, task setup and graceful stopping. This replaces the earlier independent four-event click helper; research-only requests do not authorize installing it.

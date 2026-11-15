@@ -13,6 +13,7 @@ if (-not (Test-Path -LiteralPath $compiler)) {
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 $source = Join-Path $moduleRoot 'src\LoLDamageRumble.cs'
 $integration = Join-Path $moduleRoot 'src\LoLIntegration.cs'
+$inputRemap = Join-Path $moduleRoot 'src\LoLInputRemap.cs'
 $config = Join-Path $moduleRoot 'config\FeedbackConfig.cs'
 $icon = Join-Path $moduleRoot 'assets\app.ico'
 $symbols = @()
@@ -23,7 +24,7 @@ if ($symbols.Count) { $defineArgument = @('/define:' + ($symbols -join ',')) }
 # Validate all presets and run simulated tests before producing the user application.
 & (Join-Path $PSScriptRoot 'test.ps1') -Preset $Preset -Language $Language -OutputDirectory $OutputDirectory
 $executable = Join-Path $OutputDirectory 'LoLDamageRumble.exe'
-& $compiler /nologo /target:winexe /platform:x64 "/out:$executable" "/win32icon:$icon" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll @defineArgument $source $integration $config
+& $compiler /nologo /target:winexe /platform:x64 "/out:$executable" "/win32icon:$icon" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll @defineArgument $source $integration $inputRemap $config
 if ($LASTEXITCODE -ne 0) { throw "C# build failed ($LASTEXITCODE)." }
 $manifest = [ordered]@{
     preset = $Preset
@@ -31,6 +32,7 @@ $manifest = [ordered]@{
     executableSha256 = (Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash.ToLowerInvariant()
     sourceSha256 = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLowerInvariant()
     integrationSourceSha256 = (Get-FileHash -LiteralPath $integration -Algorithm SHA256).Hash.ToLowerInvariant()
+    inputRemapSourceSha256 = (Get-FileHash -LiteralPath $inputRemap -Algorithm SHA256).Hash.ToLowerInvariant()
     configurationSha256 = (Get-FileHash -LiteralPath $config -Algorithm SHA256).Hash.ToLowerInvariant()
     iconSha256 = (Get-FileHash -LiteralPath $icon -Algorithm SHA256).Hash.ToLowerInvariant()
 }

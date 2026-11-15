@@ -354,6 +354,7 @@ namespace LoLDamageRumble {
         private readonly System.Diagnostics.Stopwatch clock=System.Diagnostics.Stopwatch.StartNew();
         private readonly PatternScheduler scheduler;
         private readonly LoLIntegration integration;
+        private readonly InputRemapHost inputRemap;
         private readonly Dictionary<FeedbackKind,int> counts=new Dictionary<FeedbackKind,int>();
         private readonly HashSet<FeedbackKind> enabledKinds=new HashSet<FeedbackKind>((FeedbackKind[])Enum.GetValues(typeof(FeedbackKind)));
         private IntPtr controller=Hid.Invalid;
@@ -367,9 +368,10 @@ namespace LoLDamageRumble {
 
         internal RumbleApp(string diagnosticStatusFile) {
             statusFile=diagnosticStatusFile;
-            Text=Ui.Text("LoL 手柄反馈","LoL rumble feedback"); ShowInTaskbar=false; WindowState=FormWindowState.Minimized;
+            Text=Ui.Text("LoL 手柄工具","LoL controller tools"); ShowInTaskbar=false; WindowState=FormWindowState.Minimized;
             IntPtr hwnd=Handle;
             integration=new LoLIntegration(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"lol-integration.json"),ClearTriggerResistance);
+            inputRemap=new InputRemapHost();
             scheduler=new PatternScheduler(WriteMotors,delegate(Pattern pattern) {
                 pulses++; lastFeedback=pattern.Label;
                 int count; counts.TryGetValue(pattern.Kind,out count); counts[pattern.Kind]=count+1;
@@ -391,6 +393,9 @@ namespace LoLDamageRumble {
             ToolStripMenuItem mapping=new ToolStripMenuItem(Ui.Text("LoL 前台映射 / 无阻力扳机","LoL foreground mapping / free triggers"));
             mapping.Enabled=integration.Configured; mapping.Checked=integration.Enabled; mapping.CheckOnClick=true;
             mapping.CheckedChanged+=delegate { integration.Enabled=mapping.Checked; }; menu.Items.Add(mapping);
+            ToolStripMenuItem space=new ToolStripMenuItem(Ui.Text("LoL 空格作为右 Ctrl","LoL Space as right Ctrl"));
+            space.Checked=inputRemap.Enabled; space.CheckOnClick=true;
+            space.CheckedChanged+=delegate { inputRemap.SetEnabled(space.Checked); }; menu.Items.Add(space);
             DetectionSettings d=FeedbackConfig.Current.Detection;
             ToolStripMenuItem preset=new ToolStripMenuItem(Ui.Text("预设：", "Preset: ")+FeedbackConfig.SelectedPreset); preset.Enabled=false; menu.Items.Add(preset);
             ToolStripMenuItem thresholds=new ToolStripMenuItem(Ui.Text("阈值：掉血 / 低血 / 低资源 ","Thresholds: damage / HP / resource ")+(100*d.HeavyDamageRatio).ToString("0.#",CultureInfo.InvariantCulture)+"% / "+(100*d.LowHealthRatio).ToString("0.#",CultureInfo.InvariantCulture)+"% / "+(100*d.LowResourceRatio).ToString("0.#",CultureInfo.InvariantCulture)+"%"); thresholds.Enabled=false; menu.Items.Add(thresholds);
@@ -402,9 +407,10 @@ namespace LoLDamageRumble {
                 level.Click+=delegate { intensity=value; foreach(ToolStripMenuItem item in levels.DropDownItems) item.Checked=item==level; }; levels.DropDownItems.Add(level);
             }
             menu.Items.Add(levels); ToolStripMenuItem exit=new ToolStripMenuItem(Ui.Text("退出并停止振动","Exit and stop vibration")); exit.Click+=delegate { Close(); }; menu.Items.Add(exit);
-            tray.Icon=appIcon; tray.Text=Ui.Text("LoL 手柄反馈：等待比赛","LoL rumble: waiting for match"); tray.ContextMenuStrip=menu; tray.Visible=true;
+            tray.Icon=appIcon; tray.Text=Ui.Text("LoL 手柄工具","LoL controller tools"); tray.ContextMenuStrip=menu; tray.Visible=true;
             timer.Interval=FeedbackConfig.Current.Polling.MotorTimerMs; timer.Tick+=delegate {
                 integration.Tick(!suspended && !locked,clock.Elapsed.TotalSeconds);
+                inputRemap.Tick();
                 try {
                     if(apiAvailable && enabled && !suspended && !locked && !Connect()) State(Ui.Text("未连接目标手柄","Target controller unavailable"));
                     scheduler.Tick(clock.Elapsed.TotalSeconds);
@@ -498,16 +504,17 @@ namespace LoLDamageRumble {
         private void WriteStatus(bool running) {
             if(statusFile==null) return;
             Dictionary<string,int> feedbackCounts=new Dictionary<string,int>(); foreach(KeyValuePair<FeedbackKind,int> pair in counts) feedbackCounts[pair.Key.ToString()]=pair.Value;
-            try { File.WriteAllText(statusFile,new JavaScriptSerializer().Serialize(new { running=running,version=5,preset=FeedbackConfig.SelectedPreset,liveClientAvailable=apiAvailable,eventDataAvailable=eventsAvailable,feedbackEnabled=enabled,controllerConnected=controller!=Hid.Invalid,controllerModel=controllerKind.ToString(),matchingControllers=matchingControllers,controllerError=controllerError,pulsesWritten=pulses,motorReportsWritten=motorReportsWritten,motorsOn=scheduler.MotorsOn,state=status.Text,lastFeedback=lastFeedback,feedbackCounts=feedbackCounts,steamInputEnabled=integration.Enabled,steamInputSelectedAppId=integration.SelectedAppId,lolWindowForeground=integration.Foreground,triggerResetEnabled=integration.ClearTriggerResistance,triggerResetsWritten=integration.TriggerResetsWritten,integrationError=integration.LastError })); } catch(IOException) {} catch(UnauthorizedAccessException) {}
+            try { File.WriteAllText(statusFile,new JavaScriptSerializer().Serialize(new { running=running,version=6,preset=FeedbackConfig.SelectedPreset,liveClientAvailable=apiAvailable,eventDataAvailable=eventsAvailable,feedbackEnabled=enabled,controllerConnected=controller!=Hid.Invalid,controllerModel=controllerKind.ToString(),matchingControllers=matchingControllers,controllerError=controllerError,pulsesWritten=pulses,motorReportsWritten=motorReportsWritten,motorsOn=scheduler.MotorsOn,state=status.Text,lastFeedback=lastFeedback,feedbackCounts=feedbackCounts,steamInputEnabled=integration.Enabled,steamInputSelectedAppId=integration.SelectedAppId,lolWindowForeground=integration.Foreground,triggerResetEnabled=integration.ClearTriggerResistance,triggerResetsWritten=integration.TriggerResetsWritten,integrationError=integration.LastError,inputRemapEnabled=inputRemap.Enabled,inputRemapError=inputRemap.LastError })); } catch(IOException) {} catch(UnauthorizedAccessException) {}
         }
         protected override void OnFormClosing(FormClosingEventArgs e) {
-            ending=true; Interlocked.Increment(ref reset); timer.Stop(); integration.Dispose(); CancelFeedback(); CloseController(); WriteStatus(false);
+            ending=true; Interlocked.Increment(ref reset); timer.Stop(); inputRemap.Dispose(); integration.Dispose(); CancelFeedback(); CloseController(); WriteStatus(false);
             SystemEvents.SessionSwitch-=SessionChanged; tray.Visible=false; tray.Dispose(); appIcon.Dispose(); timer.Dispose(); base.OnFormClosing(e);
         }
     }
 
     internal static class Program {
         [STAThread] private static void Main(string[] args) {
+            if(args.Length==1 && args[0]=="--input-worker") { InputWorker.Run(); return; }
             FeedbackConfig.Current.Validate();
             ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
             if(args.Length==1 && args[0]=="--stop") {
