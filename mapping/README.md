@@ -21,6 +21,10 @@ Only the controller's left half is used. The right hand uses a real mouse for ai
 
 ## Apply manually
 
+For automatic LoL-only activation, keep the layout on a local non-Steam shortcut and use the [optional foreground integration](../../rumble/docs/integration.md). The game can still launch from its usual launcher. Steam performs the input mapping; the optional app only selects/releases the saved layout. Keep the shortcut as the layout identity, configure its local AppID, and stop any older selection watcher. This avoids applying the LoL controls to the entire desktop.
+
+The following desktop-layout method is the original manual setup. A desktop layout is global and can interfere with other games; save the original layout before trying it.
+
 1. Completely exit Steam, then start it with **Run as administrator**.
 2. Connect your controller and enable its Steam Input support.
 3. For DS4, preview and apply `steam://controllerconfig/413080/3827898683` (英雄联盟 LOL WASD和鼠标). For DualSense, manually recreate the core outputs in its own Steam Input desktop layout.
@@ -30,6 +34,8 @@ Only the controller's left half is used. The right hand uses a real mouse for ai
 413080 identifies Steam's desktop layout, not LoL. Save your previous desktop layout first if you want to return to it. The Steam link was confirmed in the original user's local export/load record; access from other accounts is unverified. If unavailable, rebuild the core controls using the setup guide. Downloading or double-clicking a VDF does not automatically import it.
 
 ## Champion and interaction notes
+
+Riot now exposes separate WASD selection, interaction, attack and cast bindings. Check those native options before adding an operating-system remapper. [Interaction research](docs/interaction-research.md) explains the remaining uncertainty around Space + left click; no Space-to-Ctrl conversion is included.
 
 For sustained/channelled R, D-pad down can avoid accidentally moving the left stick while pressing L3. The exported layout emits **3** there, so set that champion's R to 3 in the game. Passive-E champions such as Teemo/Twisted Fate, or champions using Q/W very frequently, can use a per-champion right-button swap. Some interactions, including Frost Gates and destination selection, need **Ctrl + left click** in the user's setup. These are manual notes, not automatic code; see [usage notes](docs/usage-notes.md).
 

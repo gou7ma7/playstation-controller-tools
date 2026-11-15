@@ -7,7 +7,7 @@ The chain is **physical controller → Steam keyboard output → LoL WASD action
 ## Required: start Steam as administrator
 
 > [!IMPORTANT]
-> **Start Steam with Run as administrator before applying and using this desktop mapping in LoL.** The original user confirmed that a normal Steam instance could not control the game with this layout. Treat elevation as a required setup step.
+> **Start Steam with Run as administrator before applying and using this mapping in LoL.** The original user confirmed that a normal Steam instance could not control the game with this layout. Treat elevation as a required setup step.
 
 1. Save your work in Steam and completely exit it using **Steam → Exit** or its tray menu. Closing only the window can leave Steam running.
 2. Right-click your Steam shortcut or `steam.exe` → **Run as administrator**, then approve the Windows prompt. Opening a second shortcut while a normal Steam instance is still running does not reliably restart it with administrator rights.
@@ -19,6 +19,8 @@ Windows restricts input injection across process integrity levels; Microsoft's [
 This step applies to Steam's input mapping. Building/running the independent rumble and sleep light programs does not require administrator rights. No script in this repository elevates Steam or changes Windows permission settings.
 
 ## Core left-hand controls
+
+The desktop layout is the original global method and may interfere with other games. For activation limited to the actual foreground LoL match, use the [optional foreground integration](../../rumble/docs/integration.md): keep a local non-Steam layout entry while launching the game normally. The app only selects the layout; Steam still maps the inputs. The LoL client is not the actual match-window target.
 
 DualSense users can recreate these controls manually in their own Steam Input desktop layout. The included VDF remains DS4-specific; cross-controller import is unverified.
 

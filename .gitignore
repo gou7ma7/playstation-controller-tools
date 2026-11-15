@@ -1,5 +1,7 @@
 **/dist/
 *.log
+*.log.1
+lol-integration.json
 *.jsonl
 diagnostics.json
 runtime-status.json

@@ -1,0 +1,9 @@
+{
+  "enabled": false,
+  "steamExecutable": "",
+  "steamInputAppId": 0,
+  "gameProcessName": "League of Legends",
+  "pollMilliseconds": 200,
+  "clearTriggerResistance": false,
+  "triggerRefreshMilliseconds": 0
+}

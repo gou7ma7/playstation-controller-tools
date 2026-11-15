@@ -33,6 +33,8 @@ namespace LoLDamageRumble {
             }
         }
         private static void Run(string[] args) {
+            ProtocolTests();
+            IntegrationTests();
             FeedbackDetector detector=new FeedbackDetector(defaults.Detection);
             Check(detector.Player(P(1000,100),0).Count==0,"startup establishes baseline");
             Check(detector.Player(P(990,100),.1).Count==0,"small damage is silent");
@@ -186,6 +188,74 @@ namespace LoLDamageRumble {
             Reject(delegate { RumbleSettings c=RegressionSettings.Create(); c.Effects[FeedbackKind.Assist].DamageSlowGain=1; c.Validate(); },"damage scaling restricted to heavy damage");
             Reject(delegate { RumbleSettings c=RegressionSettings.Create(); c.Effects[FeedbackKind.Multikill].Steps=new MotorStep[]{new MotorStep(2000,1,1),new MotorStep(2000,1,1)}; c.Validate(); },"overlong effect sequences rejected");
             Reject(delegate { RumbleSettings c=RegressionSettings.Create(); c.Scheduling.QueueCapacity=0; c.Validate(); },"empty queue capacity rejected");
+        }
+        private static void ProtocolTests() {
+            Check(MotorReport.Identify(0x054c,0x09cc,1,5,64,32)==ControllerKind.Ds4V2,"USB DS4 v2 descriptor accepted");
+            Check(MotorReport.Identify(0x054c,0x0ce6,1,5,64,48)==ControllerKind.DualSense,"USB DualSense descriptor accepted");
+            Check(MotorReport.Identify(0x054c,0x0ce6,1,5,78,78)==ControllerKind.None,"Bluetooth DualSense descriptor refused");
+            Check(MotorReport.Identify(0x054c,0x09cc,1,5,78,78)==ControllerKind.None,"Bluetooth DS4 descriptor refused");
+            Check(MotorReport.Identify(0x1234,0x0ce6,1,5,64,48)==ControllerKind.None,"other vendor refused");
+            Check(MotorReport.Identify(0x054c,0x05c4,1,5,64,32)==ControllerKind.None,"DS4 first generation remains unsupported");
+            Check(MotorReport.Identify(0x054c,0x0df2,1,5,64,48)==ControllerKind.None,"untested DualSense Edge refused");
+            Check(MotorReport.Identify(0x054c,0x0ce6,0xff00,5,64,48)==ControllerKind.None,"vendor-specific HID collection refused");
+            Check(MotorReport.Identify(0x054c,0x0ce6,1,6,64,48)==ControllerKind.None,"keyboard HID collection refused");
+            Check(MotorReport.Identify(0x054c,0x09cc,1,5,64,48)==ControllerKind.None,"DS4 cannot receive a DualSense frame");
+            Check(MotorReport.Identify(0x054c,0x0ce6,1,5,64,32)==ControllerKind.None,"DualSense cannot receive a DS4 frame");
+            foreach(ControllerKind kind in new ControllerKind[]{ControllerKind.Ds4V2,ControllerKind.DualSense}) {
+                bool ds4=kind==ControllerKind.Ds4V2;
+                byte[] on=MotorReport.Make(kind,85,170), off=MotorReport.Make(kind,0,0);
+                Check(on.Length==(ds4?32:48) && off.Length==on.Length,kind+" USB frame size is correct for start and stop");
+                Check(on[0]==(ds4?5:2) && off[0]==on[0] && on[1]==(ds4?1:3) && off[1]==on[1],kind+" start and stop enable only the compatible motor protocol");
+                int fast=ds4?4:3, slow=ds4?5:4;
+                Check(on[fast]==85 && on[slow]==170 && off[fast]==0 && off[slow]==0,kind+" independent right/left strengths and zero stop preserved");
+                bool isolated=true;
+                for(int i=2;i<on.Length;i++) if(i!=fast && i!=slow && (on[i]!=0 || off[i]!=0)) isolated=false;
+                Check(isolated,kind+" light, player LED, trigger, audio and microphone fields remain disabled");
+            }
+            Reject(delegate { MotorReport.Make(ControllerKind.None,255,255); },"unknown motor protocol cannot emit a report");
+        }
+        private static void IntegrationTests() {
+            LoLIntegrationSettings disabled=LoLIntegrationSettings.Parse("{}");
+            Check(!disabled.Enabled && !disabled.ClearTriggerResistance,"absent optional settings preserve standalone rumble");
+            LoLIntegrationSettings enabled=LoLIntegrationSettings.Parse("{\"enabled\":true,\"steamExecutable\":\"C:\\\\Steam\\\\steam.exe\",\"steamInputAppId\":123,\"clearTriggerResistance\":true}");
+            Check(enabled.Enabled && enabled.SteamInputAppId==123 && enabled.ClearTriggerResistance,"local Steam integration settings validated");
+            Reject(delegate { LoLIntegrationSettings.Parse("{\"enabled\":\"false\"}"); },"string booleans cannot accidentally enable integration");
+            Reject(delegate { LoLIntegrationSettings.Parse("{\"pollMilliseconds\":1}"); },"integration polling cannot flood Steam");
+            Reject(delegate { LoLIntegrationSettings.Parse("{\"triggerRefreshMilliseconds\":1}"); },"trigger reset refresh cannot flood HID");
+            Reject(delegate { LoLIntegrationSettings.Parse("{\"enabled\":true}"); },"enabled integration needs an explicit local layout");
+            Reject(delegate { LoLIntegrationSettings.Parse("{\"gameProcessName\":\"League of Legends.exe\"}"); },"foreground rule uses process name without executable suffix");
+            Reject(delegate { LoLIntegrationSettings.Parse("{\"unexpected\":true}"); },"unknown integration options rejected");
+            LoLContextPolicy policy=new LoLContextPolicy(123,2000);
+            Check(policy.DesiredSelection(false)==0 && policy.DesiredSelection(true)==123,"only the actual foreground match selects LoL mapping");
+            Check(policy.NeedsSelection(false),"initial desktop selection restores Steam automatic mode");
+            policy.SelectionSucceeded(false); Check(!policy.NeedsSelection(false),"stable foreground does not repeatedly launch Steam");
+            Check(policy.NeedsSelection(true) && policy.NeedsSelection(true),"failed selection remains retryable");
+            policy.SelectionSucceeded(true); Check(!policy.NeedsSelection(true) && policy.NeedsSelection(false),"leaving LoL releases the forced layout");
+            policy.InvalidateSelection(); Check(policy.NeedsSelection(true),"Steam restart reselects the required layout");
+            Check(!policy.NeedsTriggerReset(false,true,0),"background LoL does not write trigger effects");
+            Check(policy.NeedsTriggerReset(true,true,.1),"entering LoL clears stale trigger resistance immediately");
+            Check(!policy.NeedsTriggerReset(true,true,.2) && !policy.NeedsTriggerReset(true,true,2),"stable LoL respects trigger refresh interval");
+            Check(policy.NeedsTriggerReset(true,true,2.1),"foreground trigger clear refresh is bounded");
+            Check(!policy.NeedsTriggerReset(false,true,2.2) && !policy.NeedsTriggerReset(false,true,99),"other games receive no trigger resets");
+            Check(policy.NeedsTriggerReset(true,true,99.1),"returning to LoL clears newly inherited resistance");
+            Check(!policy.NeedsTriggerReset(true,false,100),"disabling reset leaves triggers untouched");
+            Check(policy.NeedsTriggerReset(true,true,100.1),"reenabling reset clears on the next foreground check");
+            Check(LoLIntegrationSettings.Parse("{}").TriggerRefreshMilliseconds==0,"entry-only fallback is the new default");
+            Check(LoLIntegrationSettings.Parse("{\"triggerRefreshMilliseconds\":0}").TriggerRefreshMilliseconds==0,"zero refresh selects entry-only mode");
+            LoLContextPolicy once=new LoLContextPolicy(123,0);
+            Check(once.NeedsTriggerReset(true,true,0),"entry-only mode clears once on entering foreground");
+            Check(!once.NeedsTriggerReset(true,true,2) && !once.NeedsTriggerReset(true,true,600),"entry-only mode never periodically clears a stable foreground session");
+            Check(!once.NeedsTriggerReset(false,true,601) && once.NeedsTriggerReset(true,true,602),"entry-only mode rearms after leaving and returning to LoL");
+            Check(!once.NeedsTriggerReset(true,false,603) && once.NeedsTriggerReset(true,true,604),"entry-only mode rearms after disabling and enabling reset");
+            once.TriggerResetFailed(604);
+            Check(!once.NeedsTriggerReset(true,true,605) && once.NeedsTriggerReset(true,true,606),"failed entry-only write retries with bounded two-second backoff");
+            Check(!once.NeedsTriggerReset(true,true,1000),"successful retry does not turn entry-only mode into a periodic writer");
+            byte[] clear=TriggerReport.Clear(ControllerKind.DualSense);
+            Check(clear.Length==48 && clear[0]==2 && clear[1]==0x0c,"trigger reset uses USB DualSense frame and only trigger valid flags");
+            Check(clear[11]==5 && clear[22]==5,"both triggers receive the explicit Off mode");
+            bool isolated=true; for(int i=2;i<clear.Length;i++) if(i!=11 && i!=22 && clear[i]!=0) isolated=false;
+            Check(isolated,"trigger reset leaves motor, LED, microphone and audio fields disabled");
+            Reject(delegate { TriggerReport.Clear(ControllerKind.Ds4V2); },"DS4 cannot receive a DualSense trigger report");
         }
     }
 }

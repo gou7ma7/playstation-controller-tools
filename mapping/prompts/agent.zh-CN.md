@@ -5,11 +5,13 @@
 ```text
 请帮助我使用或定制这个仓库的 mapping/ 模块。先读取根目录和 mapping/ 的 AGENTS.md、mapping/README.zh-CN.md、docs/setup.zh-CN.md、docs/usage-notes.zh-CN.md，再读取原生 VDF 和游戏键位参考 JSON。
 
-这是左手 DS4 + 右手鼠标的英雄联盟 WASD 方案，不依赖振动程序。请严格区分“Steam 实际输出键”与“游戏技能槽”：L2 输出 E 对应 Q，L1 输出左 Shift 对应 W，鼠标右键对应 E，L3 输出 R 对应 R。
+这是左手 DS4/DualSense + 右手鼠标的英雄联盟 WASD 方案，不依赖振动程序。原生 VDF 来自 DS4，DualSense 可手动重建对应输出。请严格区分“Steam 实际输出键”与“游戏技能槽”：L2 输出 E 对应 Q，L1 输出左 Shift 对应 W，鼠标右键对应 E，L3 输出 R 对应 R。
 
 本方案的必做启动步骤：完全退出 Steam，再以管理员身份启动 Steam，然后应用布局并进入 LoL。请在设置说明中保持醒目提示。独立振动和灭灯工具不需要管理员权限；修改布局时不要自动更改权限设置。
 
 先解释现有有效绑定，再完成我的需求。保留 VDF 重复键和未启用组的语义，不把模板显示标签当作游戏动作。方向键下是 3；持续 R、单英雄右键替换和 Ctrl+左键交互是使用备注，不应擅自加入自动逻辑。
+
+仅 LoL 前台启用时读取 rumble/docs/integration.zh-CN.md：可选选择器使用本机保存的 Steam 布局，不修改桌面绑定。提出空格＋左键方案前读取 docs/interaction-research.zh-CN.md，优先原生 WASD 动作；空格作为修饰符尚未验证。仅调研的请求不能擅自增加输入钩子。
 
 修改只写入仓库，提供可检查的文件和手动应用步骤；同步中英文文档，不上传账号标识或整份个人配置。只有任务明确要求时才安装布局或修改我的 Steam/游戏设置。
 

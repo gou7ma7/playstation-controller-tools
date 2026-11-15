@@ -2,7 +2,7 @@
 
 [简体中文](feedback.zh-CN.md)
 
-The following describes the shipped `default`. Other presets and edited configs can change thresholds, switches and waveforms.
+The following describes the shipped `default`. Other presets and edited configs can change thresholds, switches and waveforms. Rules are shared by USB DS4 v2 and DualSense; the latter uses compatible two-channel rumble. Different hardware can feel different at the same intensity.
 
 - Heavy damage: ≥10% maximum HP net loss within 500 ms, one 220 ms heavy pulse. Minimum interval 650 ms. Small hits are silent individually but may accumulate to the threshold.
 - Low HP: entering ≤25% gives two 160 ms low-tone pulses, gap 100 ms. Rearm at ≥35%, minimum interval 8 s. No low alert while dead.

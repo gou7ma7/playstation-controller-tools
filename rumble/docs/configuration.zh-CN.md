@@ -4,7 +4,7 @@
 
 ## 怎样修改
 
-先检查 `config/FeedbackConfig.cs` 和运行源码。配置采用编入程序的 C# 源文件，字段有名称和双语注释。日常定制只需要调整数字、`true/false`、震动步骤或四个预设的覆盖项，不读取外部运行时 JSON。
+先检查 `config/FeedbackConfig.cs` 和运行源码。配置采用编入程序的 C# 源文件，字段有名称和双语注释。日常定制只需要调整数字、`true/false`、震动步骤或四个预设的覆盖项。反馈参数不读取外部运行时 JSON；[可选前台整合](integration.zh-CN.md) 另用本机 JSON 配置 Steam 选布局和扳机清除，不改变反馈预设。
 
 `Default()` 定义基础配置，`Create(name)` 创建独立副本后覆盖对应预设。修改基础值会影响没有覆盖该字段的其他预设。随仓库提供的 `default` 保留原使用者方案；编辑后就是你的新默认值。
 
@@ -29,7 +29,7 @@ powershell.exe -NoProfile -File .\scripts\build.ps1 -Preset default -Language au
 
 `MasterIntensity` 为 0..1，默认 .65；`IntensityChoices` 是 1..8 个 0..1 的托盘选项，初始 .45/.65/.85。若没有包含预设默认强度，托盘会自动补上。0 表示静默。
 
-最终马达字节 = `round(255 × 总强度 × 步骤强度)`。快、慢是 DS4 的两个马达，不是 Hz 频率；快马达通常较细碎，慢马达较低沉。组合节奏和强度产生不同震感，不具备 DualSense 自适应扳机能力。
+最终马达字节 = `round(255 × 总强度 × 步骤强度)`。快、慢对应 DS4 两个马达或 DualSense 兼容振动的右/左通道，不是 Hz 频率；快马达通常较细碎，慢马达较低沉。组合节奏和强度产生不同震感，两种手柄使用同一配置，但体感强度可能不同；不具备 DualSense 音频触觉或自适应扳机能力。
 
 ## 检测参数
 

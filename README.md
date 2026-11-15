@@ -10,7 +10,7 @@
 Three independent modules for a Windows controller setup:
 
 - **[mapping/](mapping/README.md)**: LoL left-hand controller + right-hand mouse controls, a native DS4 Steam Input VDF, WASD game settings and champion-specific notes. DualSense users can recreate the documented controls manually. No rumble dependency.
-- **[rumble/](rumble/README.md)**: Windows USB DS4 feedback based on the local Live Client Data API. It works without this Steam layout and does not require WASD movement or Steam.
+- **[rumble/](rumble/README.md)**: Windows USB DS4 v2 / DualSense compatible rumble feedback based on the local Live Client Data API. It works without this Steam layout and does not require WASD movement or Steam. [Optional foreground integration](rumble/docs/integration.md) can share its tray/login startup with Steam layout selection and a LoL-only DualSense trigger-resistance reset.
 - **[sleep-light/](sleep-light/README.md)**: turn off USB DS4 v2 or DualSense lights after three minutes of controller inactivity and restore configured blue on controller input. Also sends off before sleep/hibernate; resume/unlock alone does not relight in default idle mode. No Steam or game dependency.
 
 Use any module separately or together. None installs or changes another.
@@ -18,7 +18,7 @@ Use any module separately or together. None installs or changes another.
 ## Controller support
 
 - **Mapping:** the included native export is DS4-specific. The documented left-hand controls can be recreated for DualSense in Steam Input; a native DualSense export/import has not been verified.
-- **LoL rumble:** USB DS4 v2 only. DualSense game-feedback output is not implemented.
+- **LoL rumble:** USB DS4 v2 and DualSense, using compatible two-channel vibration. Audio haptics and gameplay adaptive-trigger feedback are not implemented; the optional integration can clear inherited trigger resistance.
 - **ControllerLight:** USB DS4 v2 and DualSense. Three-minute idle off and controller-input restore have been physically confirmed on both with Steam running; complete sleep/hibernate reliability still needs separate observation.
 
 The repository was renamed from `lol-ds4-steam-input` to `playstation-controller-tools`. GitHub redirects the old repository URL; update your Git remote to the new URL. ControllerLight replaces the old product name, with an identical `DS4SleepLight.exe` alias for existing shortcuts. See [migration notes](docs/migration.md).
@@ -43,7 +43,7 @@ The script first validates all presets and runs simulated behavior tests, then c
 .\rumble\dist\LoLDamageRumble.exe
 ```
 
-Building and running the rumble program requires Windows x64 and the .NET Framework 4.x C# compiler; no package downloads, API Key or administrator rights are needed for this module. The rumble device implementation supports USB DS4 v2 only (`054C:09CC`).
+Building and running the rumble program requires Windows x64 and the .NET Framework 4.x C# compiler; no package downloads, API Key or administrator rights are needed for this module. The rumble device implementation supports USB DS4 v2 (`054C:09CC`) and DualSense (`054C:0CE6`).
 
 Both programs include original application and tray icons: a purple controller/pulse for rumble, and a blue controller/moon for sleep light. Each module's `assets/` contains the editable SVG and multi-size ICO; its build embeds the ICO and records its SHA-256 in `build-info.json`. No external icon file is needed to run either executable.
 

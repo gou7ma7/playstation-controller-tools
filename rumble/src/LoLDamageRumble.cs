@@ -11,14 +11,48 @@ using System.Windows.Forms;
 using Microsoft.Win32;
 
 namespace LoLDamageRumble {
+    internal enum ControllerKind { None, Ds4V2, DualSense }
+
+    // USB protocol boundaries, kept independent of enumeration and physical writes.
+    internal static class MotorReport {
+        internal static ControllerKind Identify(ushort vendor,ushort product,ushort usagePage,ushort usage,ushort inputLength,ushort outputLength) {
+            if(vendor!=0x054c || usagePage!=1 || usage!=5 || inputLength!=64) return ControllerKind.None;
+            if(product==0x09cc && outputLength==32) return ControllerKind.Ds4V2;
+            if(product==0x0ce6 && outputLength==48) return ControllerKind.DualSense;
+            return ControllerKind.None;
+        }
+        internal static byte[] Make(ControllerKind kind,byte fast,byte slow) {
+            if(kind==ControllerKind.Ds4V2) {
+                byte[] report=new byte[32]; report[0]=5; report[1]=1; report[4]=fast; report[5]=slow; return report;
+            }
+            if(kind==ControllerKind.DualSense) {
+                byte[] report=new byte[48]; report[0]=2;
+                // Compatible two-channel vibration + haptics select. No light, audio or trigger valid flags.
+                report[1]=3; report[3]=fast; report[4]=slow; return report;
+            }
+            throw new ArgumentException("Unsupported USB motor protocol.");
+        }
+    }
+
     internal static class Hid {
+        internal sealed class Target { internal string Path; internal ControllerKind Kind; }
         [StructLayout(LayoutKind.Sequential)] internal struct InterfaceData {
             internal int Size; internal Guid ClassGuid; internal int Flags; internal IntPtr Reserved;
         }
         [StructLayout(LayoutKind.Sequential)] internal struct Overlapped {
             internal UIntPtr Internal, InternalHigh; internal uint Offset, OffsetHigh; internal IntPtr Event;
         }
+        [StructLayout(LayoutKind.Sequential)] private struct Attributes { internal int Size; internal ushort Vendor,Product,Version; }
+        [StructLayout(LayoutKind.Sequential)] private struct Caps {
+            internal ushort Usage,UsagePage,InputLength,OutputLength,FeatureLength;
+            [MarshalAs(UnmanagedType.ByValArray,SizeConst=17)] internal ushort[] Reserved;
+            internal ushort LinkNodes,InputButtons,InputValues,InputIndices,OutputButtons,OutputValues,OutputIndices,FeatureButtons,FeatureValues,FeatureIndices;
+        }
         [DllImport("hid.dll")] private static extern void HidD_GetHidGuid(out Guid guid);
+        [DllImport("hid.dll")] private static extern bool HidD_GetAttributes(IntPtr handle,ref Attributes attributes);
+        [DllImport("hid.dll")] private static extern bool HidD_GetPreparsedData(IntPtr handle,out IntPtr data);
+        [DllImport("hid.dll")] private static extern bool HidD_FreePreparsedData(IntPtr data);
+        [DllImport("hid.dll")] private static extern int HidP_GetCaps(IntPtr data,out Caps caps);
         [DllImport("setupapi.dll", CharSet=CharSet.Unicode, SetLastError=true)] private static extern IntPtr SetupDiGetClassDevs(ref Guid guid, string enumerator, IntPtr parent, uint flags);
         [DllImport("setupapi.dll", SetLastError=true)] private static extern bool SetupDiEnumDeviceInterfaces(IntPtr set, IntPtr device, ref Guid guid, uint index, ref InterfaceData data);
         [DllImport("setupapi.dll", CharSet=CharSet.Unicode, SetLastError=true)] private static extern bool SetupDiGetDeviceInterfaceDetail(IntPtr set, ref InterfaceData data, IntPtr detail, uint length, out uint required, IntPtr device);
@@ -32,34 +66,50 @@ namespace LoLDamageRumble {
         [DllImport("kernel32.dll")] internal static extern bool CloseHandle(IntPtr handle);
         internal static readonly IntPtr Invalid = new IntPtr(-1);
 
-        internal static List<string> Paths() {
+        internal static List<Target> Paths() {
             Guid guid; HidD_GetHidGuid(out guid);
             IntPtr set = SetupDiGetClassDevs(ref guid, null, IntPtr.Zero, 0x12);
-            List<string> result = new List<string>();
-            if (set == Invalid) return result;
+            List<Target> result = new List<Target>();
+            if (set == Invalid) throw new IOException("HID enumeration unavailable.");
             try {
                 for (uint index=0; ; index++) {
                     InterfaceData data = new InterfaceData(); data.Size=Marshal.SizeOf(typeof(InterfaceData));
-                    if (!SetupDiEnumDeviceInterfaces(set, IntPtr.Zero, ref guid, index, ref data)) break;
+                    if (!SetupDiEnumDeviceInterfaces(set, IntPtr.Zero, ref guid, index, ref data)) {
+                        if(Marshal.GetLastWin32Error()!=259) throw new IOException("Incomplete HID enumeration refused.");
+                        break;
+                    }
                     uint required;
                     SetupDiGetDeviceInterfaceDetail(set, ref data, IntPtr.Zero, 0, out required, IntPtr.Zero);
-                    if (required < 8) continue;
+                    if (required < 8) throw new IOException("Incomplete HID interface refused.");
                     IntPtr detail=Marshal.AllocHGlobal((int)required);
                     try {
                         Marshal.WriteInt32(detail, IntPtr.Size==8 ? 8 : 6);
                         if (SetupDiGetDeviceInterfaceDetail(set, ref data, detail, required, out required, IntPtr.Zero)) {
                             string path=Marshal.PtrToStringUni(IntPtr.Add(detail, 4));
-                            if (path!=null && path.IndexOf("vid_054c&pid_09cc", StringComparison.OrdinalIgnoreCase)>=0) result.Add(path);
-                        }
+                            if(path==null || (path.IndexOf("vid_054c&pid_09cc",StringComparison.OrdinalIgnoreCase)<0 && path.IndexOf("vid_054c&pid_0ce6",StringComparison.OrdinalIgnoreCase)<0)) continue;
+                            IntPtr file=CreateFile(path,0,3,IntPtr.Zero,3,0x40000000,IntPtr.Zero);
+                            if(file==Invalid) throw new IOException("Target HID capabilities inaccessible.");
+                            try {
+                                Attributes attributes=new Attributes(); attributes.Size=Marshal.SizeOf(typeof(Attributes)); IntPtr prep;
+                                if(!HidD_GetAttributes(file,ref attributes) || !HidD_GetPreparsedData(file,out prep)) throw new IOException("Target HID capabilities incomplete.");
+                                try {
+                                    Caps caps; if(HidP_GetCaps(prep,out caps)!=0x110000) throw new IOException("Target HID capabilities invalid.");
+                                    ControllerKind kind=MotorReport.Identify(attributes.Vendor,attributes.Product,caps.UsagePage,caps.Usage,caps.InputLength,caps.OutputLength);
+                                    if(kind!=ControllerKind.None) result.Add(new Target { Path=path,Kind=kind });
+                                } finally { HidD_FreePreparsedData(prep); }
+                            } finally { CloseHandle(file); }
+                        } else throw new IOException("Incomplete HID interface detail refused.");
                     } finally { Marshal.FreeHGlobal(detail); }
                 }
             } finally { SetupDiDestroyDeviceInfoList(set); }
             return result;
         }
         internal static IntPtr Open(string path) { return CreateFile(path, 0x40000000, 3, IntPtr.Zero, 3, 0x40000000, IntPtr.Zero); }
-        internal static void Motors(IntPtr handle, byte fast, byte slow) {
-            byte[] report=new byte[32]; report[0]=5; report[1]=1; report[4]=fast; report[5]=slow;
-            // The USB report enables motor output fields only.
+        internal static void Motors(IntPtr handle, ControllerKind kind, byte fast, byte slow) {
+            WriteReport(handle,MotorReport.Make(kind,fast,slow));
+        }
+        internal static void ClearTriggers(IntPtr handle,ControllerKind kind) { WriteReport(handle,TriggerReport.Clear(kind)); }
+        private static void WriteReport(IntPtr handle,byte[] report) {
             IntPtr ev=CreateEvent(IntPtr.Zero, true, false, null);
             if (ev==IntPtr.Zero) throw new IOException("Cannot create USB completion event.");
             GCHandle pinned=GCHandle.Alloc(report, GCHandleType.Pinned);
@@ -67,14 +117,14 @@ namespace LoLDamageRumble {
                 Overlapped ov=new Overlapped(); ov.Event=ev; uint written;
                 bool ok=WriteFile(handle, pinned.AddrOfPinnedObject(), (uint)report.Length, out written, ref ov);
                 if (!ok) {
-                    if (Marshal.GetLastWin32Error()!=997) throw new IOException("USB motor write failed.");
+                    if (Marshal.GetLastWin32Error()!=997) throw new IOException("USB output write failed.");
                     if (WaitForSingleObject(ev, 500)!=0) {
                         CancelIoEx(handle, ref ov); GetOverlappedResult(handle, ref ov, out written, true);
-                        throw new IOException("USB motor write timed out.");
+                        throw new IOException("USB output write timed out.");
                     }
-                    if (!GetOverlappedResult(handle, ref ov, out written, false)) throw new IOException("USB motor write completion failed.");
+                    if (!GetOverlappedResult(handle, ref ov, out written, false)) throw new IOException("USB output write completion failed.");
                 }
-                if (written!=32) throw new IOException("Incomplete USB motor report.");
+                if (written!=report.Length) throw new IOException("Incomplete USB output report.");
             } finally { pinned.Free(); CloseHandle(ev); }
         }
     }
@@ -303,9 +353,13 @@ namespace LoLDamageRumble {
         private readonly string statusFile;
         private readonly System.Diagnostics.Stopwatch clock=System.Diagnostics.Stopwatch.StartNew();
         private readonly PatternScheduler scheduler;
+        private readonly LoLIntegration integration;
         private readonly Dictionary<FeedbackKind,int> counts=new Dictionary<FeedbackKind,int>();
         private readonly HashSet<FeedbackKind> enabledKinds=new HashSet<FeedbackKind>((FeedbackKind[])Enum.GetValues(typeof(FeedbackKind)));
         private IntPtr controller=Hid.Invalid;
+        private ControllerKind controllerKind=ControllerKind.None;
+        private string controllerError="";
+        private int matchingControllers,motorReportsWritten;
         private volatile bool ending,suspended,locked,enabled=true,apiAvailable,eventsAvailable;
         private long reset;
         private double intensity=FeedbackConfig.Current.MasterIntensity,nextConnect,nextStatus;
@@ -315,6 +369,7 @@ namespace LoLDamageRumble {
             statusFile=diagnosticStatusFile;
             Text=Ui.Text("LoL 手柄反馈","LoL rumble feedback"); ShowInTaskbar=false; WindowState=FormWindowState.Minimized;
             IntPtr hwnd=Handle;
+            integration=new LoLIntegration(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"lol-integration.json"),ClearTriggerResistance);
             scheduler=new PatternScheduler(WriteMotors,delegate(Pattern pattern) {
                 pulses++; lastFeedback=pattern.Label;
                 int count; counts.TryGetValue(pattern.Kind,out count); counts[pattern.Kind]=count+1;
@@ -333,6 +388,9 @@ namespace LoLDamageRumble {
                 ToolStripMenuItem test=new ToolStripMenuItem(pattern.Label); test.Click+=delegate { CancelFeedback(); Submit(new Feedback(captured,.15,3),true); }; tests.DropDownItems.Add(test);
             }
             menu.Items.Add(kinds); menu.Items.Add(tests);
+            ToolStripMenuItem mapping=new ToolStripMenuItem(Ui.Text("LoL 前台映射 / 无阻力扳机","LoL foreground mapping / free triggers"));
+            mapping.Enabled=integration.Configured; mapping.Checked=integration.Enabled; mapping.CheckOnClick=true;
+            mapping.CheckedChanged+=delegate { integration.Enabled=mapping.Checked; }; menu.Items.Add(mapping);
             DetectionSettings d=FeedbackConfig.Current.Detection;
             ToolStripMenuItem preset=new ToolStripMenuItem(Ui.Text("预设：", "Preset: ")+FeedbackConfig.SelectedPreset); preset.Enabled=false; menu.Items.Add(preset);
             ToolStripMenuItem thresholds=new ToolStripMenuItem(Ui.Text("阈值：掉血 / 低血 / 低资源 ","Thresholds: damage / HP / resource ")+(100*d.HeavyDamageRatio).ToString("0.#",CultureInfo.InvariantCulture)+"% / "+(100*d.LowHealthRatio).ToString("0.#",CultureInfo.InvariantCulture)+"% / "+(100*d.LowResourceRatio).ToString("0.#",CultureInfo.InvariantCulture)+"%"); thresholds.Enabled=false; menu.Items.Add(thresholds);
@@ -346,7 +404,11 @@ namespace LoLDamageRumble {
             menu.Items.Add(levels); ToolStripMenuItem exit=new ToolStripMenuItem(Ui.Text("退出并停止振动","Exit and stop vibration")); exit.Click+=delegate { Close(); }; menu.Items.Add(exit);
             tray.Icon=appIcon; tray.Text=Ui.Text("LoL 手柄反馈：等待比赛","LoL rumble: waiting for match"); tray.ContextMenuStrip=menu; tray.Visible=true;
             timer.Interval=FeedbackConfig.Current.Polling.MotorTimerMs; timer.Tick+=delegate {
-                try { scheduler.Tick(clock.Elapsed.TotalSeconds); } catch(IOException) { ControllerFailure(); }
+                integration.Tick(!suspended && !locked,clock.Elapsed.TotalSeconds);
+                try {
+                    if(apiAvailable && enabled && !suspended && !locked && !Connect()) State(Ui.Text("未连接目标手柄","Target controller unavailable"));
+                    scheduler.Tick(clock.Elapsed.TotalSeconds);
+                } catch(IOException ex) { ControllerFailure(ex); }
                 if(statusFile!=null && clock.Elapsed.TotalSeconds>=nextStatus) { nextStatus=clock.Elapsed.TotalSeconds+FeedbackConfig.Current.Polling.StatusIntervalSeconds; WriteStatus(true); }
             }; timer.Start(); SystemEvents.SessionSwitch+=SessionChanged;
             Thread worker=new Thread(Poll); worker.IsBackground=true; worker.Start();
@@ -355,13 +417,13 @@ namespace LoLDamageRumble {
         protected override void WndProc(ref Message m) {
             if(m.Msg==0x218) {
                 int eventId=m.WParam.ToInt32();
-                if(eventId==4) { suspended=true; Interlocked.Increment(ref reset); CancelFeedback(); }
+                if(eventId==4) { suspended=true; Interlocked.Increment(ref reset); CancelFeedback(); integration.Suspend(clock.Elapsed.TotalSeconds); }
                 if(eventId==7 || eventId==18) { suspended=false; Interlocked.Increment(ref reset); }
             }
             base.WndProc(ref m);
         }
         private void SessionChanged(object sender,SessionSwitchEventArgs e) {
-            if(e.Reason==SessionSwitchReason.SessionLock) { locked=true; Interlocked.Increment(ref reset); Post(delegate { CancelFeedback(); }); }
+            if(e.Reason==SessionSwitchReason.SessionLock) { locked=true; Interlocked.Increment(ref reset); Post(delegate { CancelFeedback(); integration.Suspend(clock.Elapsed.TotalSeconds); }); }
             else if(e.Reason==SessionSwitchReason.SessionUnlock) { locked=false; Interlocked.Increment(ref reset); }
         }
         private void Post(Action action) { if(!ending) try { BeginInvoke(action); } catch(InvalidOperationException) {} }
@@ -375,20 +437,35 @@ namespace LoLDamageRumble {
         private bool Connect() {
             if(controller!=Hid.Invalid) return true;
             double now=clock.Elapsed.TotalSeconds; if(now<nextConnect) return false; nextConnect=now+FeedbackConfig.Current.Polling.ReconnectSeconds;
-            List<string> paths=Hid.Paths(); if(paths.Count!=1) return false;
-            controller=Hid.Open(paths[0]); return controller!=Hid.Invalid;
+            matchingControllers=0; List<Hid.Target> paths=Hid.Paths(); matchingControllers=paths.Count;
+            if(paths.Count!=1) { controllerError=paths.Count==0 ? "No supported USB controller." : "Multiple supported controllers refused."; return false; }
+            controller=Hid.Open(paths[0].Path);
+            if(controller==Hid.Invalid) { controllerError="HID output open failed (Win32 "+Marshal.GetLastWin32Error()+")."; return false; }
+            controllerKind=paths[0].Kind; controllerError="";
+            State(Ui.Text("正在监测比赛反馈","Monitoring match feedback")+" ("+controllerKind+")"); return true;
         }
-        private void CloseController() { if(controller!=Hid.Invalid) { Hid.CloseHandle(controller); controller=Hid.Invalid; } }
+        private void CloseController() { if(controller!=Hid.Invalid) { Hid.CloseHandle(controller); controller=Hid.Invalid; } controllerKind=ControllerKind.None; }
         private void WriteMotors(double fast,double slow) {
-            if(fast==0 && slow==0) { if(controller!=Hid.Invalid) Hid.Motors(controller,0,0); return; }
+            if(fast==0 && slow==0) { if(controller!=Hid.Invalid) { Hid.Motors(controller,controllerKind,0,0); motorReportsWritten++; } return; }
             if(!Connect()) throw new IOException("Target USB controller unavailable.");
-            Hid.Motors(controller,(byte)Math.Round(255*intensity*fast),(byte)Math.Round(255*intensity*slow));
+            Hid.Motors(controller,controllerKind,(byte)Math.Round(255*intensity*fast),(byte)Math.Round(255*intensity*slow)); motorReportsWritten++;
         }
-        private void CancelFeedback() { try { scheduler.Cancel(); } catch(IOException) { CloseController(); scheduler.Cancel(); } }
-        private void ControllerFailure() { CloseController(); scheduler.Cancel(); State(Ui.Text("未连接目标手柄","Target controller unavailable")); }
+        private bool ClearTriggerResistance() {
+            if(controller!=Hid.Invalid && controllerKind==ControllerKind.DualSense) {
+                try { Hid.ClearTriggers(controller,controllerKind); return true; }
+                catch(IOException) { CloseController(); CancelFeedback(); throw; }
+            }
+            List<Hid.Target> paths=Hid.Paths();
+            if(paths.Count!=1) throw new IOException("Expected one supported USB controller for trigger reset.");
+            if(paths[0].Kind!=ControllerKind.DualSense) return false;
+            IntPtr handle=Hid.Open(paths[0].Path); if(handle==Hid.Invalid) throw new IOException("Cannot open DualSense trigger output.");
+            try { Hid.ClearTriggers(handle,paths[0].Kind); return true; } finally { Hid.CloseHandle(handle); }
+        }
+        private void CancelFeedback() { try { scheduler.Cancel(); } catch(IOException ex) { controllerError=ex.Message; CloseController(); scheduler.Cancel(); } }
+        private void ControllerFailure(IOException error) { if(controllerError.Length==0) controllerError=error.Message; CloseController(); scheduler.Cancel(); State(Ui.Text("未连接目标手柄","Target controller unavailable")); }
         private void Submit(Feedback feedback,bool test) {
             if(ending || suspended || locked || (!test && (!enabled || !enabledKinds.Contains(feedback.Kind)))) return;
-            try { scheduler.Enqueue(Pattern.Make(feedback),clock.Elapsed.TotalSeconds); } catch(IOException) { ControllerFailure(); }
+            try { scheduler.Enqueue(Pattern.Make(feedback),clock.Elapsed.TotalSeconds); } catch(IOException ex) { ControllerFailure(ex); }
         }
         private void Poll() {
             FeedbackDetector detector=new FeedbackDetector(); long revision=Interlocked.Read(ref reset);
@@ -421,10 +498,10 @@ namespace LoLDamageRumble {
         private void WriteStatus(bool running) {
             if(statusFile==null) return;
             Dictionary<string,int> feedbackCounts=new Dictionary<string,int>(); foreach(KeyValuePair<FeedbackKind,int> pair in counts) feedbackCounts[pair.Key.ToString()]=pair.Value;
-            try { File.WriteAllText(statusFile,new JavaScriptSerializer().Serialize(new { running=running,version=3,preset=FeedbackConfig.SelectedPreset,liveClientAvailable=apiAvailable,eventDataAvailable=eventsAvailable,feedbackEnabled=enabled,pulsesWritten=pulses,motorsOn=scheduler.MotorsOn,state=status.Text,lastFeedback=lastFeedback,feedbackCounts=feedbackCounts })); } catch(IOException) {} catch(UnauthorizedAccessException) {}
+            try { File.WriteAllText(statusFile,new JavaScriptSerializer().Serialize(new { running=running,version=5,preset=FeedbackConfig.SelectedPreset,liveClientAvailable=apiAvailable,eventDataAvailable=eventsAvailable,feedbackEnabled=enabled,controllerConnected=controller!=Hid.Invalid,controllerModel=controllerKind.ToString(),matchingControllers=matchingControllers,controllerError=controllerError,pulsesWritten=pulses,motorReportsWritten=motorReportsWritten,motorsOn=scheduler.MotorsOn,state=status.Text,lastFeedback=lastFeedback,feedbackCounts=feedbackCounts,steamInputEnabled=integration.Enabled,steamInputSelectedAppId=integration.SelectedAppId,lolWindowForeground=integration.Foreground,triggerResetEnabled=integration.ClearTriggerResistance,triggerResetsWritten=integration.TriggerResetsWritten,integrationError=integration.LastError })); } catch(IOException) {} catch(UnauthorizedAccessException) {}
         }
         protected override void OnFormClosing(FormClosingEventArgs e) {
-            ending=true; Interlocked.Increment(ref reset); timer.Stop(); CancelFeedback(); CloseController(); WriteStatus(false);
+            ending=true; Interlocked.Increment(ref reset); timer.Stop(); integration.Dispose(); CancelFeedback(); CloseController(); WriteStatus(false);
             SystemEvents.SessionSwitch-=SessionChanged; tray.Visible=false; tray.Dispose(); appIcon.Dispose(); timer.Dispose(); base.OnFormClosing(e);
         }
     }
@@ -434,30 +511,44 @@ namespace LoLDamageRumble {
             FeedbackConfig.Current.Validate();
             ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
             if(args.Length==1 && args[0]=="--stop") {
-                try { using(EventWaitHandle stop=EventWaitHandle.OpenExisting("Local\\LoLDamageRumble_Stop_054C_09CC")) stop.Set(); } catch(WaitHandleCannotBeOpenedException) {} return;
+                try { using(EventWaitHandle stop=EventWaitHandle.OpenExisting("Local\\LoLDamageRumble_Core_Stop_054C_09CC")) stop.Set(); } catch(WaitHandleCannotBeOpenedException) {} return;
             }
             if(args.Length==2 && args[0]=="--diagnose") {
                 PlayerSnapshot player; bool live=LiveClient.Player(out player); List<Dictionary<string,object>> events; bool eventApi=LiveClient.Events(out events);
-                List<string> paths=Hid.Paths(); bool writable=false;
-                if(paths.Count==1) { IntPtr h=Hid.Open(paths[0]); writable=h!=Hid.Invalid; if(writable) Hid.CloseHandle(h); }
-                File.WriteAllText(args[1],new JavaScriptSerializer().Serialize(new { version=3,preset=FeedbackConfig.SelectedPreset,liveClientAvailable=live,validHealth=live,eventDataAvailable=eventApi,resourceType=live?player.ResourceType:"",matchingControllers=paths.Count,hidOutputAccessible=writable,apiError=LiveClient.LastError })); return;
+                List<Hid.Target> paths=new List<Hid.Target>(); bool writable=false; string error="";
+                try {
+                    paths=Hid.Paths();
+                    if(paths.Count==1) { IntPtr h=Hid.Open(paths[0].Path); writable=h!=Hid.Invalid; if(writable) Hid.CloseHandle(h); else error="HID output open failed (Win32 "+Marshal.GetLastWin32Error()+")."; }
+                    else error=paths.Count==0 ? "No supported USB controller." : "Multiple supported controllers refused.";
+                } catch(IOException ex) { error=ex.Message; }
+                File.WriteAllText(args[1],new JavaScriptSerializer().Serialize(new { version=4,preset=FeedbackConfig.SelectedPreset,liveClientAvailable=live,validHealth=live,eventDataAvailable=eventApi,resourceType=live?player.ResourceType:"",matchingControllers=paths.Count,controllerModel=paths.Count==1?paths[0].Kind.ToString():"None",hidOutputAccessible=writable,controllerError=error,apiError=LiveClient.LastError })); return;
             }
             if(args.Length==2 && args[0]=="--test") {
-                List<string> paths=Hid.Paths(); if(paths.Count!=1) throw new IOException("Expected one target controller.");
-                IntPtr h=Hid.Open(paths[0]); if(h==Hid.Invalid) throw new IOException("Cannot open controller output.");
-                try { Hid.Motors(h,85,85); Thread.Sleep(150); }
-                finally { try { Hid.Motors(h,0,0); } finally { Hid.CloseHandle(h); } }
-                File.WriteAllText(args[1],"{\"motorOnAndOffWritten\":true,\"pulseMilliseconds\":150}"); return;
+                List<Hid.Target> paths=Hid.Paths(); if(paths.Count!=1) throw new IOException("Expected one target controller.");
+                Hid.Target target=paths[0]; IntPtr h=Hid.Open(target.Path); if(h==Hid.Invalid) throw new IOException("Cannot open controller output.");
+                try { Hid.Motors(h,target.Kind,85,85); Thread.Sleep(150); }
+                finally { try { Hid.Motors(h,target.Kind,0,0); } finally { Hid.CloseHandle(h); } }
+                File.WriteAllText(args[1],new JavaScriptSerializer().Serialize(new { controllerModel=target.Kind.ToString(),motorOnAndOffWritten=true,pulseMilliseconds=150 })); return;
             }
-            bool created; using(Mutex singleton=new Mutex(true,"Local\\LoLDamageRumble_054C_09CC",out created)) {
-                if(!created) { MessageBox.Show(Ui.Text("程序已在运行，请查看系统托盘。","Already running. Check the system tray."),Ui.Text("LoL 手柄反馈","LoL rumble feedback")); return; }
+            if(args.Length==2 && args[0]=="--reset-triggers") {
+                List<Hid.Target> paths=Hid.Paths(); if(paths.Count!=1 || paths[0].Kind!=ControllerKind.DualSense) throw new IOException("Expected one USB DualSense.");
+                IntPtr handle=Hid.Open(paths[0].Path); if(handle==Hid.Invalid) throw new IOException("Cannot open DualSense output.");
+                try { Hid.ClearTriggers(handle,paths[0].Kind); } finally { Hid.CloseHandle(handle); }
+                File.WriteAllText(args[1],"{\"triggerResistanceCleared\":true,\"controllerModel\":\"DualSense\"}"); return;
+            }
+            using(Mutex singleton=new Mutex(false,"Local\\LoLDamageRumble_Core_054C_09CC")) {
+                bool owns; try { owns=singleton.WaitOne(0); } catch(AbandonedMutexException) { owns=true; }
+                if(!owns) { MessageBox.Show(Ui.Text("程序已在运行，请查看系统托盘。","Already running. Check the system tray."),Ui.Text("LoL 手柄反馈","LoL rumble feedback")); return; }
+                try {
                 Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
                 string statusFile=args.Length==2 && args[0]=="--status-file" ? Path.GetFullPath(args[1]) : null;
-                using(EventWaitHandle stop=new EventWaitHandle(false,EventResetMode.AutoReset,"Local\\LoLDamageRumble_Stop_054C_09CC"))
+                using(EventWaitHandle stop=new EventWaitHandle(false,EventResetMode.AutoReset,"Local\\LoLDamageRumble_Core_Stop_054C_09CC"))
                 using(RumbleApp app=new RumbleApp(statusFile)) {
+                    stop.Reset();
                     RegisteredWaitHandle wait=ThreadPool.RegisterWaitForSingleObject(stop,delegate(object state,bool timedOut) { try { app.BeginInvoke(new Action(app.Close)); } catch(InvalidOperationException) {} },null,-1,true);
                     try { Application.Run(app); } finally { wait.Unregister(null); }
                 }
+                } finally { singleton.ReleaseMutex(); }
             }
         }
     }

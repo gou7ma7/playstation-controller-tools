@@ -10,6 +10,7 @@
 - Do not confuse skill slot Q/W/E/R with the keyboard letter Steam emits.
 - D-pad down currently emits 3. Sustained-R use needs a per-champion game R binding to 3; it is a note, not automatic switching.
 - Passive E/high-frequency Q/W substitutions and Ctrl+left-click portal interaction are usage notes only.
+- Prefer the optional rumble foreground integration when automatic LoL-only activation is requested; the original desktop method is global. It selects a local saved layout, not a public hard-coded AppID. Native WASD interaction research is in docs/interaction-research.md; do not assume Space is a supported chord modifier or add a keyboard hook without an explicit implementation request.
 - Parse Valve KeyValues with duplicate keys preserved; a plain JSON dictionary parser can lose repeated groups/bindings.
 - Keep inactive groups distinguishable from active bindings. Template labels such as Reload are not LoL actions.
 - Do not rewrite Steam/global game settings or expose private metadata as part of repo maintenance.

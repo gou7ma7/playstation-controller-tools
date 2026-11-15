@@ -4,7 +4,7 @@
 
 ## How editing works
 
-Review `config/FeedbackConfig.cs` and the runtime first. The configuration is C# source compiled into the executable, with named fields and bilingual comments. Normal customization means changing numbers, `true`/`false`, pulse arrays or the four preset overrides. No external runtime JSON file is loaded.
+Review `config/FeedbackConfig.cs` and the runtime first. The configuration is C# source compiled into the executable, with named fields and bilingual comments. Normal customization means changing numbers, `true`/`false`, pulse arrays or the four preset overrides. Feedback tuning does not load external runtime JSON. [Optional foreground integration](integration.md) uses a separate local JSON file for Steam selection and trigger resets; it does not change these feedback presets.
 
 `Default()` defines the base settings. `Create(name)` builds an independent copy and applies a preset's overrides. Edits to the base also affect presets except for fields they override. The shipped `default` matches the original user's setup; after your edits it becomes your own default.
 
@@ -29,7 +29,7 @@ Changing a preset is a compile-time choice. `-Language auto` follows Windows UI 
 
 `MasterIntensity` is 0..1, default .65. `IntensityChoices` contains 1..8 values, each 0..1, initially .45/.65/.85. The tray also adds the selected preset's master value if it is missing. Zero gives silent output.
 
-Each motor byte is `round(255 × master × step strength)`. Fast/slow are two separate DS4 motors, not frequencies in Hz. Fast tends to feel finer; slow tends to feel heavier. Pulse timing and intensity form a pattern; they do not provide DualSense adaptive-trigger behavior.
+Each motor byte is `round(255 × master × step strength)`. Fast/slow are the two DS4 motor channels or DualSense compatible right/left vibration channels, not frequencies in Hz. Fast tends to feel finer; slow tends to feel heavier. Pulse timing and intensity form a pattern; the same settings apply to both controllers, although perceived strength can differ. They do not provide DualSense audio haptics or adaptive-trigger behavior.
 
 ## Detection fields
 
