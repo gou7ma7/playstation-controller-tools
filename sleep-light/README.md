@@ -84,6 +84,8 @@ For USB DS4 v2, the original user confirmed **three-minute idle off → controll
 
 USB DualSense support was checked with Steam running: a stationary read-only probe received 752 reports in three seconds with zero activity samples. The user confirmed that a ten-second physical test turned off both RGB and white player LEDs, then restored configured blue and the center white LED. A full DualSense sleep/hibernate transition remains a separate physical test.
 
+The user also confirmed the default DualSense **three-minute idle off → controller input → color restore**. Logs recorded the successful off at approximately 180 seconds and a successful blue restore on subsequent controller activity. This verifies the awake idle cycle, not an entire sleep/hibernate transition.
+
 The original sleep-only version previously passed a user-observed S3 cycle. Later sleep failures were reported despite successful pre-suspend writes; the idle test does not establish reliable S4 or automatic S3-to-S4 behavior. Full sleep behavior still requires separate observation.
 
 ## Coexistence and limits
