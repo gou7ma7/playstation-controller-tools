@@ -20,6 +20,8 @@ This step applies to Steam's input mapping. Building/running the independent rum
 
 ## Core left-hand controls
 
+DualSense users can recreate these controls manually in their own Steam Input desktop layout. The included VDF remains DS4-specific; cross-controller import is unverified.
+
 - Left stick up/down/left/right → W/S/A/D → movement.
 - L2 left trigger → E → Q skill.
 - L1 left bumper → Left Shift → W skill.

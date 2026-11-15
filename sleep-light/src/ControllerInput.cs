@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using Microsoft.Win32.SafeHandles;
 
-namespace DS4SleepLight {
+namespace ControllerLight {
     internal sealed class InputSnapshot {
         internal bool Connected;
         internal long Generation, Reports, Activity;
@@ -46,7 +46,7 @@ namespace DS4SleepLight {
                     int session = epoch;
                     try {
                         using (NativeHid.InputStream stream = NativeHid.OpenInput()) {
-                            ControllerActivity detector = new ControllerActivity(stream.Kind, SleepLightConfig.StickDeadzone, SleepLightConfig.TriggerThreshold);
+                            ControllerActivity detector = new ControllerActivity(stream.Kind, LightConfig.StickDeadzone, LightConfig.TriggerThreshold);
                             bool first = true;
                             while (enabled && !stopping && epoch == session) {
                                 int length;

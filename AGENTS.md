@@ -1,5 +1,7 @@
 # Agent entry point / Agent 入口
 
+Project: PlayStation Controller Tools (`playstation-controller-tools`). Each module has explicit device support; the project name does not imply universal PS4/PS5 support.
+
 This repository contains three independently usable modules. 本仓库的三个模块可独立使用。
 
 - `mapping/`: native Steam Input layout + LoL WASD configuration; no program or rumble dependency.

@@ -1,8 +1,10 @@
-# 左手 DS4 + 右手鼠标按键映射
+# LoL 左手手柄 + 右手鼠标按键映射
 
 简体中文 · [English](README.md)
 
 本模块可独立使用，包含 Steam 原生布局和把手柄输出转换成英雄技能的游戏 WASD 设置，不需要振动程序。
+
+VDF 是忠实保留的 **DS4 原生导出**。DualSense 可按文档，在 Steam Input 中手动重建左摇杆、L1、L2、L3 的相同键盘输出。原生 DualSense 导出或跨型号导入尚未验证，因此保留 DS4 文件名与控制器类型。
 
 > [!IMPORTANT]
 > **必做：以管理员身份启动 Steam，再使用这套 LoL 映射。** 先完全退出原有 Steam 进程，再右键 Steam → **以管理员身份运行**，确认 Windows 提示。普通权限的 Steam 可能在桌面上正常应用布局，却没有权限控制英雄联盟。详见 [启动与排查步骤](docs/setup.zh-CN.md)。此要求仅针对 Steam 映射，独立反馈工具不需要管理员权限。
@@ -20,8 +22,8 @@
 ## 手动应用
 
 1. 完全退出 Steam，再右键选择 **以管理员身份运行**。
-2. 连接 DS4，开启 Steam Input 支持。
-3. 在 Steam 打开 `steam://controllerconfig/413080/3827898683`，预览后应用到桌面布局，名称为「英雄联盟 LOL WASD和鼠标」。
+2. 连接手柄，开启 Steam Input 支持。
+3. DS4 可预览并应用 `steam://controllerconfig/413080/3827898683`（「英雄联盟 LOL WASD和鼠标」）；DualSense 请在自己的桌面布局中手动重建核心输出。
 4. 在游戏 WASD 模式中设置 Q→E、W→左 Shift、E→鼠标右键、R→R。
 5. 先在训练模式验证移动和技能，再进入正常游戏。
 

@@ -1,8 +1,10 @@
-# Left-hand DS4 + right-hand mouse mapping
+# LoL left-hand controller + right-hand mouse mapping
 
 [简体中文](README.zh-CN.md) · English
 
 This module is independently usable. It contains a native Steam Input layout and the LoL WASD settings needed to turn controller outputs into skill actions. No feedback application is required.
+
+The VDF is a faithful **DS4 export**. DualSense users can recreate the documented left-stick/L1/L2/L3 keyboard outputs manually. A native DualSense export or cross-controller import is unverified; the DS4 filename and controller type are deliberately preserved.
 
 > [!IMPORTANT]
 > **Required: start Steam as administrator before using this mapping in LoL.** Completely exit the existing Steam instance, then right-click Steam → **Run as administrator** and approve the Windows prompt. A normal Steam instance may apply the layout on the desktop but have no permission to control LoL. Follow the [startup and troubleshooting steps](docs/setup.md). This requirement applies to Steam mapping; the independent feedback tools do not need administrator rights.
@@ -20,8 +22,8 @@ Only the controller's left half is used. The right hand uses a real mouse for ai
 ## Apply manually
 
 1. Completely exit Steam, then start it with **Run as administrator**.
-2. Connect a DS4 and enable its Steam Input support.
-3. Open `steam://controllerconfig/413080/3827898683` in Steam, preview the layout and apply it to the desktop configuration. Name: 英雄联盟 LOL WASD和鼠标.
+2. Connect your controller and enable its Steam Input support.
+3. For DS4, preview and apply `steam://controllerconfig/413080/3827898683` (英雄联盟 LOL WASD和鼠标). For DualSense, manually recreate the core outputs in its own Steam Input desktop layout.
 4. Enable LoL's WASD mode and assign Q→E, W→Left Shift, E→Mouse right, R→R in that mode's settings.
 5. Test movement and skill use in practice mode before normal play.
 

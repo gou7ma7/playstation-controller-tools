@@ -1,9 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Web.Script.Serialization;
 
-namespace DS4SleepLight {
+namespace ControllerLight {
     internal static class Tests {
         private static readonly List<string> checks = new List<string>();
         private static void Check(string name, bool condition) { if (!condition) throw new Exception(name); checks.Add(name); }
@@ -13,7 +13,7 @@ namespace DS4SleepLight {
         private static bool Activity(ControllerActivity detector, byte[] report) { bool activity; if (!detector.Observe(report, report.Length, out activity)) throw new Exception("Valid report rejected"); return activity; }
         internal static int Main(string[] args) {
             try {
-                SleepLightConfig.Validate();
+                LightConfig.Validate();
                 Check("configuration valid", true);
                 byte[] off = LightReport.Make(0, 0, 0), color = LightReport.Make(7, 83, 255);
                 Check("USB report length", off.Length == 32);
@@ -40,10 +40,10 @@ namespace DS4SleepLight {
                 Check("DualSense non-gamepad collection refused", !LightReport.Supported(0x054c, 0x0ce6, 1, 2, 48));
                 byte[] dsOff = LightReport.Make(ControllerKind.DualSense, 0, 0, 0), dsColor = LightReport.Make(ControllerKind.DualSense, 7, 83, 255);
                 Check("DualSense Windows USB report length and id", dsOff.Length == 48 && dsOff[0] == 2 && dsColor.Length == 48);
-                Check("DualSense only light enable flags", dsColor[1] == 0 && dsColor[2] == (SleepLightConfig.ControlDualSensePlayerLeds ? 0x14 : 0x04) && dsColor[39] == 0);
+                Check("DualSense only light enable flags", dsColor[1] == 0 && dsColor[2] == (LightConfig.ControlDualSensePlayerLeds ? 0x14 : 0x04) && dsColor[39] == 0);
                 Check("DualSense RGB layout", dsColor[45] == 7 && dsColor[46] == 83 && dsColor[47] == 255);
                 Check("DualSense RGB and player lights off", dsOff[44] == 0 && dsOff[45] == 0 && dsOff[46] == 0 && dsOff[47] == 0);
-                Check("DualSense player lights use configured mask", dsColor[44] == (SleepLightConfig.ControlDualSensePlayerLeds ? SleepLightConfig.DualSensePlayerLeds : 0));
+                Check("DualSense player lights use configured mask", dsColor[44] == (LightConfig.ControlDualSensePlayerLeds ? LightConfig.DualSensePlayerLeds : 0));
                 bool unrelatedClear = true;
                 for (int i = 3; i < 44; i++) unrelatedClear &= dsColor[i] == 0 && dsOff[i] == 0;
                 Check("DualSense motors triggers audio mute and LED animations untouched", unrelatedClear);
@@ -154,7 +154,7 @@ namespace DS4SleepLight {
                 Check("idle mode unlock cannot request a resume color", !inputOnly.Unlock() && inputOnly.Phase == LightPhase.Ready);
                 IdleLightPolicy oneOff = new IdleLightPolicy(180000, 0, 3000); oneOff.Connected(0); oneOff.Next(180000); oneOff.Completed(IdleLightAction.Off, true, 180000);
                 Check("zero refresh disables repeated idle off writes", oneOff.Next(900000) == IdleLightAction.None);
-                string logFolder = Path.Combine(Path.GetTempPath(), "DS4SleepLight-tests-" + Guid.NewGuid().ToString("N"));
+                string logFolder = Path.Combine(Path.GetTempPath(), "ControllerLight-tests-" + Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(logFolder);
                 try {
                     string blocked = Path.Combine(logFolder, "blocked"); File.WriteAllText(blocked, "a file cannot be a log directory");
@@ -169,7 +169,7 @@ namespace DS4SleepLight {
                 } finally {
                     // Delete only this freshly created, validated test directory.
                     string full = Path.GetFullPath(logFolder), temp = Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-                    if (full.StartsWith(temp, StringComparison.OrdinalIgnoreCase) && Path.GetFileName(full).StartsWith("DS4SleepLight-tests-", StringComparison.Ordinal)) Directory.Delete(full, true);
+                    if (full.StartsWith(temp, StringComparison.OrdinalIgnoreCase) && Path.GetFileName(full).StartsWith("ControllerLight-tests-", StringComparison.Ordinal)) Directory.Delete(full, true);
                 }
                 string json = new JavaScriptSerializer().Serialize(new { passed = checks.Count, hardwareWrites = 0, checks = checks });
                 if (args.Length == 1) File.WriteAllText(args[0], json);

@@ -2,7 +2,7 @@
 
 [English](configuration.md)
 
-设置来自 `config/SleepLightConfig.cs`，会编入程序。修改后退出正在运行的工具，重新编译并启动。不需要运行时配置文件或其他模块。
+设置来自 `config/LightConfig.cs`，会编入程序。修改后退出正在运行的工具，重新编译并启动。不需要运行时配置文件或其他模块。
 
 - `EnableIdleLight`：默认 `true`，启用手柄空闲控制；恢复电脑/解锁本身不点亮。设为 `false` 切回仅睡眠模式，该模式不启动输入读取线程。
 - `IdleTimeoutSeconds`：`10..3600`，默认 `180` 秒。从首个有效输入基线或最后一次手柄操作计时；静置上报、鼠标/键盘活动都不重置。重新连接或界面长时间停止后建立新基线，不使用排队的旧输入。
@@ -42,7 +42,7 @@ powershell.exe -NoProfile -File .\scripts\build.ps1 -Language zh
 只读输入诊断（不发送灯光报告）：
 
 ```powershell
-Start-Process .\dist\DS4SleepLight.exe -ArgumentList '--input-diagnose 3 dist/input-diagnostic.json' -WindowStyle Hidden -Wait
+Start-Process .\dist\ControllerLight.exe -ArgumentList '--input-diagnose 3 dist/input-diagnostic.json' -WindowStyle Hidden -Wait
 Get-Content .\dist\input-diagnostic.json
 ```
 
@@ -52,7 +52,7 @@ Get-Content .\dist\input-diagnostic.json
 
 ## 日志诊断
 
-优先写入 EXE 旁的 `logs/events.log`；程序目录不可写时回退到 `%LOCALAPPDATA%\DS4SleepLight\events.log`。托盘 **打开日志** 指向当前实际文件。`EnableLocalLog = false` 可关闭记录；超过 1 MiB 轮换为 `events.log.old`，排查时可一起保留。旧版本 AppData 日志不会自动删除或合并。
+优先写入 EXE 旁的 `logs/events.log`；程序目录不可写时回退到 `%LOCALAPPDATA%\ControllerLight\events.log`。托盘 **打开日志** 指向当前实际文件。`EnableLocalLog = false` 可关闭记录；超过 1 MiB 轮换为 `events.log.old`，排查时可一起保留。旧版本 AppData 日志不会自动删除或合并。
 
 每行有 UTC/本地时间、临时 `run` 编号、记录顺序、进程/线程编号和运行耗时，用于对照事件，不是设备或账号标识。不会记录设备路径、序列号、账号或比赛数据。
 

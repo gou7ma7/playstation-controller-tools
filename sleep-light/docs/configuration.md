@@ -2,7 +2,7 @@
 
 [简体中文](configuration.zh-CN.md)
 
-All settings are compiled from `config/SleepLightConfig.cs`; edit, exit the running watcher, rebuild, then restart it. No runtime configuration file or shared module is needed.
+All settings are compiled from `config/LightConfig.cs`; edit, exit the running watcher, rebuild, then restart it. No runtime configuration file or shared module is needed.
 
 - `EnableIdleLight`: default `true`. Enable controller inactivity control. Resume/unlock alone does not restore color. Set `false` for the original sleep-only policy; the input reader is not started in that mode.
 - `IdleTimeoutSeconds`: `10..3600`, default `180`. Count from the first valid input baseline or last controller activity. Stationary reports, mouse and keyboard activity do not reset it. After reconnecting or a long UI gap, use a fresh baseline instead of queued old input.
@@ -42,7 +42,7 @@ It also checks DS4 and DualSense USB input layouts, format rejection, noise filt
 Read-only input probe (no light reports):
 
 ```powershell
-Start-Process .\dist\DS4SleepLight.exe -ArgumentList '--input-diagnose 3 dist/input-diagnostic.json' -WindowStyle Hidden -Wait
+Start-Process .\dist\ControllerLight.exe -ArgumentList '--input-diagnose 3 dist/input-diagnostic.json' -WindowStyle Hidden -Wait
 Get-Content .\dist\input-diagnostic.json
 ```
 
@@ -52,7 +52,7 @@ For a real sleep check, manually test S3 and S4 separately. `suspend_off ... out
 
 ## Diagnostic log
 
-The primary file is `logs/events.log` beside your executable, with `%LOCALAPPDATA%\DS4SleepLight\events.log` as a fallback when the program folder cannot be written. Use **Open log** in the tray to find the active file. `EnableLocalLog = false` disables these records. Above 1 MiB the log rotates to `events.log.old`; keep both when inspecting a cycle.
+The primary file is `logs/events.log` beside your executable, with `%LOCALAPPDATA%\ControllerLight\events.log` as a fallback when the program folder cannot be written. Use **Open log** in the tray to find the active file. `EnableLocalLog = false` disables these records. Above 1 MiB the log rotates to `events.log.old`; keep both when inspecting a cycle.
 
 Every record has UTC/local time, an ephemeral `run` ID, sequence, process/thread number and elapsed time. These are for event correlation, not device/account identifiers. No device path, serial, account or match data is recorded. Old versions' AppData logs are not automatically deleted or merged.
 

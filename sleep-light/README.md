@@ -4,7 +4,7 @@
 
 > **Review the source and build locally. Do not directly run an `.exe` downloaded from the internet.**
 
-An independent Windows tray utility for **one USB DualShock 4 v2 (`054C:09CC`) or DualSense (`054C:0CE6`)**. By default it turns the lights off after **three minutes without controller input** and restores configured blue when the controller is used again. It also sends off before sleep/hibernate. It needs neither Steam, League of Legends, nor the other repository modules. The executable remains `DS4SleepLight.exe` to preserve existing launch and login shortcuts.
+An independent Windows tray utility for **one USB DualShock 4 v2 (`054C:09CC`) or DualSense (`054C:0CE6`)**. By default it turns the lights off after **three minutes without controller input** and restores configured blue when the controller is used again. It also sends off before sleep/hibernate. It needs neither Steam, League of Legends, nor the other repository modules. The main executable is `ControllerLight.exe`; builds also include an identical `DS4SleepLight.exe` compatibility alias. Both names share one watcher instance.
 
 ## Behavior
 
@@ -22,16 +22,16 @@ USB DS4 v1, DualSense Edge, Bluetooth controllers and multiple connected target 
 
 ## Review, build and run
 
-Read [source](src/Program.cs), [power policy and USB report](src/SleepPolicy.cs), [input parsing and idle policy](src/ControllerActivity.cs), [shared input reader](src/ControllerInput.cs), [native USB output](src/NativeHid.cs), [configuration](config/SleepLightConfig.cs), [build script](scripts/build.ps1) and [offline tests](tests/SleepLightTests.cs).
+Read [source](src/Program.cs), [power policy and USB report](src/SleepPolicy.cs), [input parsing and idle policy](src/ControllerActivity.cs), [shared input reader](src/ControllerInput.cs), [native USB output](src/NativeHid.cs), [configuration](config/LightConfig.cs), [build script](scripts/build.ps1) and [offline tests](tests/SleepLightTests.cs).
 
 From the repository root, in Windows PowerShell:
 
 ```powershell
 powershell.exe -NoProfile -File .\sleep-light\scripts\build.ps1
-.\sleep-light\dist\DS4SleepLight.exe
+.\sleep-light\dist\ControllerLight.exe
 ```
 
-Requires Windows x64 and the .NET Framework 4.x C# compiler. No downloaded packages, administrator rights or added device driver. The build runs offline checks and produces `dist/DS4SleepLight.exe`, `test-results.json` and `build-info.json`; it does not start the watcher or send USB commands.
+Requires Windows x64 and the .NET Framework 4.x C# compiler. No downloaded packages, administrator rights or added device driver. The build runs offline checks and produces `dist/ControllerLight.exe`, its identical `DS4SleepLight.exe` alias, `test-results.json` and `build-info.json`; it does not start the watcher or send USB commands.
 
 The folder is standalone: after copying `sleep-light/` elsewhere, run `scripts/build.ps1` there. `-Language auto` uses the Windows UI language; `zh` and `en` force Chinese or English. Stop a running watcher before rebuilding its executable.
 
@@ -45,25 +45,25 @@ After reviewing and building your own executable:
 powershell.exe -NoProfile -File .\sleep-light\scripts\autostart.ps1 -Action Enable
 ```
 
-This adds only a **current-user Startup shortcut** pointing to your local executable. It neither launches it immediately nor installs a service/driver. Keep the executable at that location; run it once for the current session. The watcher allows one instance per session.
+This saves a **current-user Startup shortcut**, `ControllerLight.lnk`, pointing to your local executable, then removes the legacy `DS4SleepLight.lnk` entry. Disable removes both shortcut names. It neither launches it immediately nor installs a service/driver. Keep the executable at that location; run it once for the current session. The watcher allows one instance per session.
 
 To undo:
 
 ```powershell
 powershell.exe -NoProfile -File .\sleep-light\scripts\autostart.ps1 -Action Disable
-.\sleep-light\dist\DS4SleepLight.exe --stop
+.\sleep-light\dist\ControllerLight.exe --stop
 ```
 
 The tray menu also provides Exit and a connection check that does not change lights. Use `-Executable` with the autostart script when you keep your compiled binary elsewhere.
 
 ## Configure and verify
 
-Edit [SleepLightConfig.cs](config/SleepLightConfig.cs) and rebuild. See the [configuration and verification guide](docs/configuration.md).
+Edit [LightConfig.cs](config/LightConfig.cs) and rebuild. See the [configuration and verification guide](docs/configuration.md).
 
 Read-only USB diagnosis, from the repository root:
 
 ```powershell
-Start-Process .\sleep-light\dist\DS4SleepLight.exe -ArgumentList '--diagnose sleep-light/dist/diagnostic.json' -WindowStyle Hidden -Wait
+Start-Process .\sleep-light\dist\ControllerLight.exe -ArgumentList '--diagnose sleep-light/dist/diagnostic.json' -WindowStyle Hidden -Wait
 Get-Content .\sleep-light\dist\diagnostic.json
 ```
 
@@ -72,7 +72,7 @@ Optional **physical light test**: this changes the light for three seconds and t
 Stop the watcher first so idle off refreshes do not interfere with this test, then restart it afterward.
 
 ```powershell
-Start-Process .\sleep-light\dist\DS4SleepLight.exe -ArgumentList '--test-cycle 3 sleep-light/dist/cycle-result.json' -WindowStyle Hidden -Wait
+Start-Process .\sleep-light\dist\ControllerLight.exe -ArgumentList '--test-cycle 3 sleep-light/dist/cycle-result.json' -WindowStyle Hidden -Wait
 Get-Content .\sleep-light\dist\cycle-result.json
 ```
 
@@ -94,7 +94,7 @@ For DS4, the repository's rumble reports enable only motors (`0x01`), while this
 
 Other software that also writes the lightbar, exclusive HID access, device removal during transition, or missing/delayed Windows power notifications may prevent a visible response. The program does not keep the computer awake, disconnect USB, change BIOS/power settings, remap buttons, read game data or read game memory. Physical behavior must be checked on your device; no guarantee is made solely from a successful write.
 
-The optional rotating log is `logs/events.log` beside the executable; if that folder is not writable, it falls back to `%LOCALAPPDATA%\DS4SleepLight\events.log`. The tray's **Open log** command opens the active file. It records UTC/local timestamps, a per-run ID and sequence, power/session states, RGB commands and USB timing, plus input connection, idle-off/activity-restore transitions, aggregate report counts, refresh counts and long UI timer gaps. Successful repeated idle-off writes are summarized at most once per minute; failures are recorded. Heartbeat/device-change records themselves do not perform USB IO. A log above 1 MiB rotates to `events.log.old`.
+The optional rotating log is `logs/events.log` beside the executable; if that folder is not writable, it falls back to `%LOCALAPPDATA%\ControllerLight\events.log`. The tray's **Open log** command opens the active file. It records UTC/local timestamps, a per-run ID and sequence, power/session states, RGB commands and USB timing, plus input connection, idle-off/activity-restore transitions, aggregate report counts, refresh counts and long UI timer gaps. Successful repeated idle-off writes are summarized at most once per minute; failures are recorded. Heartbeat/device-change records themselves do not perform USB IO. A log above 1 MiB rotates to `events.log.old`.
 
 These records help distinguish a missing/delayed notification from a failed or delayed USB write. They cannot read the actual light color, identify another application's light commands, or prove that a successful write stayed visible. Logs and diagnosis/test files omit device paths, serials, accounts and game data. See [log interpretation](docs/configuration.md#diagnostic-log).
 

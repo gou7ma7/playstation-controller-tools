@@ -1,4 +1,4 @@
-﻿namespace DS4SleepLight {
+namespace ControllerLight {
     internal enum LightPhase { Ready, Suspended, WaitingForUser, WaitingForUnlock, RestorePending }
     // Pure state machine: no Windows, USB, clock or filesystem calls.
     // 纯状态机：不调用 Windows、USB、时钟或文件系统。
@@ -49,8 +49,8 @@
                 // Enable only RGB/player LEDs. Haptic, trigger, audio and mute flags stay clear.
                 // Windows USB 输出为 48 字节；只启用灯条/玩家灯，不操作触觉、扳机、音频或静音灯。
                 byte[] ds = new byte[48]; ds[0] = 0x02;
-                ds[2] = (byte)(SleepLightConfig.ControlDualSensePlayerLeds ? 0x14 : 0x04);
-                if (SleepLightConfig.ControlDualSensePlayerLeds && (red != 0 || green != 0 || blue != 0)) ds[44] = (byte)SleepLightConfig.DualSensePlayerLeds;
+                ds[2] = (byte)(LightConfig.ControlDualSensePlayerLeds ? 0x14 : 0x04);
+                if (LightConfig.ControlDualSensePlayerLeds && (red != 0 || green != 0 || blue != 0)) ds[44] = (byte)LightConfig.DualSensePlayerLeds;
                 ds[45] = (byte)red; ds[46] = (byte)green; ds[47] = (byte)blue;
                 return ds;
             }

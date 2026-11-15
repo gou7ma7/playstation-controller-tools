@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 
-namespace DS4SleepLight {
+namespace ControllerLight {
     internal sealed class WriteResult {
         internal string Outcome; internal int Matches, Writes, Win32Error;
         internal string Controller = "none";
@@ -129,7 +129,7 @@ namespace DS4SleepLight {
                         error = Marshal.GetLastWin32Error();
                         if (error != 997) return false;
                         pending = true;
-                        if (WaitForSingleObject(completion, (uint)SleepLightConfig.UsbWriteTimeoutMs) != 0) { error = 1460; return false; }
+                        if (WaitForSingleObject(completion, (uint)LightConfig.UsbWriteTimeoutMs) != 0) { error = 1460; return false; }
                         bool completed = GetOverlappedResult(file, ov, out written, false);
                         if (!completed) { error = Marshal.GetLastWin32Error(); pending = error == 996; return false; }
                         pending = false;

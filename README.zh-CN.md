@@ -1,4 +1,4 @@
-# 英雄联盟：手柄按键映射、振动反馈与睡眠灭灯
+# PlayStation Controller Tools — Windows PS4 / PS5 手柄工具
 
 简体中文 · [English](README.md)
 
@@ -9,11 +9,19 @@
 
 仓库包含三个独立模块：
 
-- **[mapping/ 按键映射](mapping/README.zh-CN.md)**：左手 DS4、右手鼠标，包含 Steam 原生 VDF、游戏 WASD 设置和英雄使用备注。不需要振动程序。
+- **[mapping/ 按键映射](mapping/README.zh-CN.md)**：LoL 左手手柄、右手鼠标方案，包含 DS4 原生 Steam Input VDF、游戏 WASD 设置和英雄备注；DualSense 可按说明手动重建。无需振动程序。
 - **[rumble/ 振动反馈](rumble/README.zh-CN.md)**：读取英雄联盟本地比赛接口，为 USB DS4 提供振动。不依赖这套 Steam 布局，也不要求使用 WASD 模式或 Steam。
 - **[sleep-light/ 睡眠与空闲灭灯](sleep-light/README.zh-CN.md)**：USB DS4 第二代或 DualSense 三分钟不操作就灭灯，实际操作手柄恢复配置蓝色；睡眠/休眠前也灭灯，默认空闲模式恢复/解锁本身不点亮。不依赖 Steam 或游戏。
 
 可以任选一个，也可以组合使用，模块不会安装或修改对方。
+
+## 手柄支持范围
+
+- **按键映射**：原生导出来自 DS4。DualSense 可在 Steam Input 中手动重建文档中的左手键位；原生 DualSense 导出/导入尚未验证。
+- **LoL 振动反馈**：目前仅 USB DS4 第二代；尚未实现 DualSense 游戏反馈输出。
+- **ControllerLight 灭灯**：支持 USB DS4 第二代和 DualSense，两者在 Steam 运行时的三分钟空闲灭灯与操作恢复均已肉眼确认；完整睡眠/休眠可靠性仍需另行观察。
+
+仓库由 `lol-ds4-steam-input` 更名为 `playstation-controller-tools`。GitHub 会重定向旧仓库链接，建议将 Git remote 改为新地址。灭灯工具正式改名 ControllerLight，同时提供内容一致的 `DS4SleepLight.exe` 兼容入口，保留已有快捷方式的可用性。见 [迁移说明](docs/migration.zh-CN.md)。
 
 ## 先检查，再编译
 
@@ -45,7 +53,7 @@ powershell.exe -NoProfile -File .\rumble\scripts\build.ps1
 
 ```powershell
 powershell.exe -NoProfile -File .\sleep-light\scripts\build.ps1
-.\sleep-light\dist\DS4SleepLight.exe
+.\sleep-light\dist\ControllerLight.exe
 ```
 
 构建运行离线检查，不发送 USB 指令。[当前用户登录自启动](sleep-light/README.zh-CN.md#可选登录自启动) 是独立、可撤销的步骤。工具仅更新灯光字段，包括可选的 DualSense 白色玩家灯；不改变马达、自适应扳机、麦克风静音状态或按键映射。[详细配置与验证](sleep-light/docs/configuration.zh-CN.md)。

@@ -1,6 +1,6 @@
 using System;
 
-namespace DS4SleepLight {
+namespace ControllerLight {
     // USB report 0x01 only. Never interpret packet counters or motion as activity.
     // 只解释 USB 0x01；包计数、传感器、电量和触摸坐标都不算操作。
     internal sealed class ControllerActivity {

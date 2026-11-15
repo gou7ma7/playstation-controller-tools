@@ -3,6 +3,7 @@
 [English](CONTRIBUTING.md)
 
 - 保持 `mapping/`、`rumble/` 和 `sleep-light/` 可独立使用；根目录负责导航和许可证。
+- 按模块说明设备支持。ControllerLight 支持 DualSense，不代表 DS4 原生 VDF 或振动已经通用；继续注明原文件来源和限制，未来更名时保留灯光兼容别名与旧 IPC 标识。
 - 同步修改中英文文档。没有实际键位变更需求时，保留原生 VDF 的绑定命令。
 - 振动定制优先修改 `rumble/config/FeedbackConfig.cs`；改变 `default` 行为时明确记录原因与变化。
 - 修改源码或配置后运行 `rumble/scripts/build.ps1`。测试使用虚构比赛数据和模拟马达输出。

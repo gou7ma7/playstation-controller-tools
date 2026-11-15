@@ -1,4 +1,4 @@
-# LoL controller mapping, rumble & sleep light
+# PlayStation Controller Tools
 
 [简体中文](README.zh-CN.md) · English
 
@@ -9,11 +9,19 @@
 
 Three independent modules for a Windows controller setup:
 
-- **[mapping/](mapping/README.md)**: left-hand DualShock 4 + right-hand mouse, Steam Input VDF, WASD game settings and champion-specific usage notes. It works without the rumble program.
+- **[mapping/](mapping/README.md)**: LoL left-hand controller + right-hand mouse controls, a native DS4 Steam Input VDF, WASD game settings and champion-specific notes. DualSense users can recreate the documented controls manually. No rumble dependency.
 - **[rumble/](rumble/README.md)**: Windows USB DS4 feedback based on the local Live Client Data API. It works without this Steam layout and does not require WASD movement or Steam.
 - **[sleep-light/](sleep-light/README.md)**: turn off USB DS4 v2 or DualSense lights after three minutes of controller inactivity and restore configured blue on controller input. Also sends off before sleep/hibernate; resume/unlock alone does not relight in default idle mode. No Steam or game dependency.
 
 Use any module separately or together. None installs or changes another.
+
+## Controller support
+
+- **Mapping:** the included native export is DS4-specific. The documented left-hand controls can be recreated for DualSense in Steam Input; a native DualSense export/import has not been verified.
+- **LoL rumble:** USB DS4 v2 only. DualSense game-feedback output is not implemented.
+- **ControllerLight:** USB DS4 v2 and DualSense. Three-minute idle off and controller-input restore have been physically confirmed on both with Steam running; complete sleep/hibernate reliability still needs separate observation.
+
+The repository was renamed from `lol-ds4-steam-input` to `playstation-controller-tools`. GitHub redirects the old repository URL; update your Git remote to the new URL. ControllerLight replaces the old product name, with an identical `DS4SleepLight.exe` alias for existing shortcuts. See [migration notes](docs/migration.md).
 
 ## Review and build first
 
@@ -45,7 +53,7 @@ Review [sleep light source and configuration](sleep-light/README.md#review-build
 
 ```powershell
 powershell.exe -NoProfile -File .\sleep-light\scripts\build.ps1
-.\sleep-light\dist\DS4SleepLight.exe
+.\sleep-light\dist\ControllerLight.exe
 ```
 
 The build runs offline checks without USB writes. [Optional current-user login autostart](sleep-light/README.md#optional-login-autostart) is a separate, reversible step. The watcher updates only lighting fields, including optional DualSense white player LEDs; it does not change motors, adaptive triggers, microphone mute or button mappings. [Detailed configuration and verification](sleep-light/docs/configuration.md).

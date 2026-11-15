@@ -1,6 +1,6 @@
-﻿namespace DS4SleepLight {
+namespace ControllerLight {
     // Edit this file and rebuild. 修改此文件后重新编译。
-    internal static class SleepLightConfig {
+    internal static class LightConfig {
         // Default: controller inactivity, not mouse/keyboard or USB report arrival.
         // 默认按手柄操作判断空闲；鼠标/键盘活动和 USB 数据上报不影响倒计时。
         internal static readonly bool EnableIdleLight = true;

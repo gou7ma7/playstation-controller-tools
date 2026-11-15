@@ -45,10 +45,11 @@ jobs:
         run: ./sleep-light/scripts/build.ps1 -Language ${{ matrix.language }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2, Node.js 24
         with:
-          name: DS4SleepLight-${{ matrix.language }}-windows-x64
+          name: ControllerLight-${{ matrix.language }}-windows-x64
           retention-days: 7
           if-no-files-found: error
           path: |
+            sleep-light/dist/ControllerLight.exe
             sleep-light/dist/DS4SleepLight.exe
             sleep-light/dist/test-results.json
             sleep-light/dist/build-info.json
