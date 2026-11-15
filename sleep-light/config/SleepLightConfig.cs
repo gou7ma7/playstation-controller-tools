@@ -18,6 +18,10 @@
         internal static readonly bool RestoreOnResume = true;
         // RGB channels, 0..255. Default blue. RGB 通道 0..255，默认蓝色。
         internal static readonly int Red = 0, Green = 0, Blue = 255;
+        // DualSense only: turn white player LEDs off with RGB; restore this five-bit mask.
+        // 仅 PS5：白色玩家灯随 RGB 灭灯；恢复时使用下列五位掩码。静音状态灯始终不操作。
+        internal static readonly bool ControlDualSensePlayerLeds = true;
+        internal static readonly int DualSensePlayerLeds = 4; // 0..31; 4 = center LED / 中央一灯；0 = none / 不亮
         // Wait for the USB stack after user resume, milliseconds (0..10000).
         // 用户恢复后等待 USB 就绪的毫秒数（0..10000）。
         internal static readonly int RestoreDelayMs = 1500;
@@ -38,6 +42,7 @@
 
         internal static void Validate() {
             Range("Red", Red, 0, 255); Range("Green", Green, 0, 255); Range("Blue", Blue, 0, 255);
+            Range("DualSensePlayerLeds", DualSensePlayerLeds, 0, 31);
             Range("IdleTimeoutSeconds", IdleTimeoutSeconds, 10, 3600);
             Range("StickDeadzone", StickDeadzone, 4, 96); Range("TriggerThreshold", TriggerThreshold, 1, 255);
             if (IdleOffRefreshMs != 0) Range("IdleOffRefreshMs", IdleOffRefreshMs, 1000, 60000);

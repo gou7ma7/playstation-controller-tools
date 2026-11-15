@@ -11,7 +11,7 @@
 
 - **[mapping/ 按键映射](mapping/README.zh-CN.md)**：左手 DS4、右手鼠标，包含 Steam 原生 VDF、游戏 WASD 设置和英雄使用备注。不需要振动程序。
 - **[rumble/ 振动反馈](rumble/README.zh-CN.md)**：读取英雄联盟本地比赛接口，为 USB DS4 提供振动。不依赖这套 Steam 布局，也不要求使用 WASD 模式或 Steam。
-- **[sleep-light/ 睡眠与空闲灭灯](sleep-light/README.zh-CN.md)**：USB DS4 三分钟不操作就灭灯，实际操作手柄恢复配置蓝色；睡眠/休眠前也灭灯，默认空闲模式恢复/解锁本身不点亮。不依赖 Steam 或游戏。
+- **[sleep-light/ 睡眠与空闲灭灯](sleep-light/README.zh-CN.md)**：USB DS4 第二代或 DualSense 三分钟不操作就灭灯，实际操作手柄恢复配置蓝色；睡眠/休眠前也灭灯，默认空闲模式恢复/解锁本身不点亮。不依赖 Steam 或游戏。
 
 可以任选一个，也可以组合使用，模块不会安装或修改对方。
 
@@ -48,7 +48,7 @@ powershell.exe -NoProfile -File .\sleep-light\scripts\build.ps1
 .\sleep-light\dist\DS4SleepLight.exe
 ```
 
-构建运行离线检查，不发送 USB 指令。[当前用户登录自启动](sleep-light/README.zh-CN.md#可选登录自启动) 是独立、可撤销的步骤。工具仅更新灯色/闪烁字段，不改变马达输出或按键映射。[详细配置与验证](sleep-light/docs/configuration.zh-CN.md)。
+构建运行离线检查，不发送 USB 指令。[当前用户登录自启动](sleep-light/README.zh-CN.md#可选登录自启动) 是独立、可撤销的步骤。工具仅更新灯光字段，包括可选的 DualSense 白色玩家灯；不改变马达、自适应扳机、麦克风静音状态或按键映射。[详细配置与验证](sleep-light/docs/configuration.zh-CN.md)。
 
 ## 定制振动
 

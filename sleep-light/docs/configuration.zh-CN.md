@@ -12,6 +12,8 @@
 - `IdleWriteRetryMs`：`500..10000`，默认 `3000` 毫秒。空闲模式输出失败后的重试间隔；必须仍有新鲜、有效输入，断线或目标不明确时不发送。
 - `RestoreOnResume`：默认 `true`，**仅 `EnableIdleLight = false` 时生效**。仅睡眠模式恢复/解锁后恢复颜色；设为 `false` 则不恢复。它不关闭空闲模式的手柄操作恢复。
 - `Red`、`Green`、`Blue`：整数 `0..255`，默认 `0,0,255`。低亮度蓝可用 `0,0,32`，紫色可用 `96,0,96`。这是原始 RGB 数值，不是 Steam 的亮度滑块。全部为零则恢复后也保持黑色。
+- `ControlDualSensePlayerLeds`：默认 `true`，仅 DualSense 生效。RGB 与白色玩家灯一起控制；灭灯时清空五个白灯。设为 `false` 则完全留给其他软件管理玩家灯。麦克风静音状态灯始终不操作。
+- `DualSensePlayerLeds`：`0..31`，默认 `4`（中央一灯）。恢复时使用五位掩码，`1`、`2`、`4`、`8`、`16` 分别选择各灯；`0` 只恢复 RGB，不亮白灯，`31` 点亮五灯。仅在玩家灯控制开启且请求 RGB 非零时使用，不能还原 Steam 之前的灯位。
 - `RestoreDelayMs`：`0..10000`，默认 `1500` 毫秒。仅睡眠模式恢复/解锁后等待 USB 就绪的延迟。
 - `RestoreRetryWindowMs`：`500..30000`，默认 `5000` 毫秒。仅睡眠模式延迟结束后的重试窗口，超时后等待下一次睡眠周期。
 - `RestoreRetryIntervalMs`：`100..5000`，默认 `500` 毫秒。仅睡眠模式恢复失败后的重试间隔，成功则立即停止。
@@ -35,7 +37,7 @@ powershell.exe -NoProfile -File .\scripts\build.ps1 -Language zh
 
 构建验证配置范围，并使用模拟检查覆盖报告字段、设备能力筛选、重复通知、解锁延迟恢复、待恢复任务取消，以及 S3 → 自动唤醒 → S4。测试程序不调用原生 USB 接口。
 
-也覆盖错误 USB 格式、噪声过滤、持续按住、准确的 180 秒边界、重试、手柄操作恢复以及断线/睡眠取消。输入解析和空闲状态机在 `src/ControllerActivity.cs`，共享、可取消的重叠 `ReadFile` 在 `src/ControllerInput.cs`。参考 [微软 HID 输入说明](https://learn.microsoft.com/en-us/windows-hardware/drivers/hid/obtaining-hid-reports) 与 [Linux DS4 报告格式](https://github.com/torvalds/linux/blob/master/drivers/hid/hid-playstation.c)。
+也覆盖 DS4 与 DualSense USB 按键布局、错误格式、噪声过滤、持续按住、准确的 180 秒边界、重试、手柄操作恢复以及断线/睡眠取消。输入解析和空闲状态机在 `src/ControllerActivity.cs`，共享、可取消的重叠 `ReadFile` 在 `src/ControllerInput.cs`。参考 [微软 HID 输入说明](https://learn.microsoft.com/en-us/windows-hardware/drivers/hid/obtaining-hid-reports) 与 [Linux PlayStation 报告格式](https://github.com/torvalds/linux/blob/master/drivers/hid/hid-playstation.c)。支持的 DualSense 游戏手柄集合在 Windows 上声明输出为 48 字节，Linux 的 USB 输出结构包含不同长度的填充；不能套用 DS4 的 32 字节或蓝牙的 78 字节布局。
 
 只读输入诊断（不发送灯光报告）：
 
@@ -58,6 +60,7 @@ Get-Content .\dist\input-diagnostic.json
 - `session_received` / `session_apply_begin` / `session_applied`：区分锁屏/解锁回调收到和排队到界面线程后的处理时机，并记录状态机。
 - `suspend_off_begin` / `suspend_off`：灭灯操作开始/完成、结果及总耗时。
 - `usb_operation_*`、`usb_enumeration_*`、`usb_write_attempt_*`：操作类别、匹配数量、发送的 RGB、每次写入结果、Win32 错误和耗时。`usb_cancel_wait_*` 标记取消清理的开始/结束，可发现驱动是否延迟完成取消。
+- `usb_light_target`：选择的手柄类型和输出长度，不记录设备身份或路径。诊断 JSON 与输入连接/运行状态也区分 `DualShock4V2` 和 `DualSense`。
 - `interactive_resume_restore_scheduled`、`resume_restore_*`：恢复延迟、RGB、写入结果、重试或完成。后台自动唤醒仍不恢复灯色。
 - `input_status`、`input_connected_no_light_write`、`idle_input_baseline_no_light_write`、`idle_input_lost_no_light_write`：输入访问、新基线以及输入不可用；基线不发送点亮颜色。
 - `idle_timeout_off`：灭灯结果与空闲时长。睡眠/重新连接后状态本来已黑时也用此记录重发灭灯；`idle_ms` 小于阈值可区分该情况。

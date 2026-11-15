@@ -8,10 +8,12 @@ using Microsoft.Win32.SafeHandles;
 namespace DS4SleepLight {
     internal sealed class WriteResult {
         internal string Outcome; internal int Matches, Writes, Win32Error;
+        internal string Controller = "none";
         internal bool Success { get { return Outcome == "written"; } }
         internal WriteResult(string outcome, int matches, int writes, int error) { Outcome = outcome; Matches = matches; Writes = writes; Win32Error = error; }
     }
     internal static partial class NativeHid {
+        private sealed class Target { internal string Path; internal ControllerKind Kind; }
         [StructLayout(LayoutKind.Sequential)] private struct InterfaceData { internal int Size; internal Guid ClassGuid; internal int Flags; internal IntPtr Reserved; }
         [StructLayout(LayoutKind.Sequential)] private struct Attributes { internal int Size; internal ushort Vendor, Product, Version; }
         [StructLayout(LayoutKind.Sequential)] private struct Caps {
@@ -36,11 +38,11 @@ namespace DS4SleepLight {
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern SafeWaitHandle CreateEvent(IntPtr security, bool manual, bool initial, string name);
         [DllImport("kernel32.dll")] private static extern uint WaitForSingleObject(SafeWaitHandle handle, uint timeout);
 
-        private static List<string> Paths(bool input = false) {
+        private static List<Target> Paths() {
             Guid guid; HidD_GetHidGuid(out guid);
             IntPtr set = SetupDiGetClassDevs(ref guid, null, IntPtr.Zero, 0x12);
             if (set == new IntPtr(-1)) throw new IOException("HID enumeration failed.");
-            List<string> paths = new List<string>();
+            List<Target> paths = new List<Target>();
             try {
                 for (uint index = 0; ; index++) {
                     InterfaceData item = new InterfaceData(); item.Size = Marshal.SizeOf(typeof(InterfaceData));
@@ -55,7 +57,7 @@ namespace DS4SleepLight {
                         Marshal.WriteInt32(detail, IntPtr.Size == 8 ? 8 : 6);
                         if (!SetupDiGetDeviceInterfaceDetail(set, ref item, detail, required, out required, IntPtr.Zero)) continue;
                         string path = Marshal.PtrToStringUni(IntPtr.Add(detail, 4));
-                        if (path == null || path.IndexOf("vid_054c&pid_09cc", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                        if (path == null || (path.IndexOf("vid_054c&pid_09cc", StringComparison.OrdinalIgnoreCase) < 0 && path.IndexOf("vid_054c&pid_0ce6", StringComparison.OrdinalIgnoreCase) < 0)) continue;
                         using (SafeFileHandle file = Open(path, 0)) {
                             if (file.IsInvalid) throw new IOException("Target capabilities inaccessible; enumeration refused.");
                             Attributes attributes = new Attributes(); attributes.Size = Marshal.SizeOf(typeof(Attributes));
@@ -64,7 +66,8 @@ namespace DS4SleepLight {
                             try {
                                 Caps caps;
                                 if (HidP_GetCaps(prep, out caps) != 0x110000) throw new IOException("Target capabilities invalid; enumeration refused.");
-                                if (LightReport.Supported(attributes.Vendor, attributes.Product, caps.UsagePage, caps.Usage, caps.OutputLength) && (!input || caps.InputLength == 64)) paths.Add(path);
+                                ControllerKind kind;
+                                if (LightReport.TryKind(attributes.Vendor, attributes.Product, caps.UsagePage, caps.Usage, caps.InputLength, caps.OutputLength, out kind)) paths.Add(new Target { Path = path, Kind = kind });
                             } finally { HidD_FreePreparsedData(prep); }
                         }
                     } finally { Marshal.FreeHGlobal(detail); }
@@ -73,28 +76,31 @@ namespace DS4SleepLight {
             return paths;
         }
         private static SafeFileHandle Open(string path, uint access) { return CreateFile(path, access, 3, IntPtr.Zero, 3, 0x40000000, IntPtr.Zero); }
-        internal static WriteResult Diagnose() { return RecordedExecute(null, 0, 0); }
-        internal static WriteResult Send(byte[] report, int attempts, int repeatDelayMs) { return RecordedExecute(report, attempts, repeatDelayMs); }
-        private static WriteResult RecordedExecute(byte[] report, int attempts, int repeatDelayMs) {
+        internal static WriteResult Diagnose() { return RecordedExecute(0, 0, 0, 0, 0); }
+        internal static WriteResult Send(int red, int green, int blue, int attempts, int repeatDelayMs) { return RecordedExecute(red, green, blue, attempts, repeatDelayMs); }
+        private static WriteResult RecordedExecute(int red, int green, int blue, int attempts, int repeatDelayMs) {
             Stopwatch duration = Stopwatch.StartNew();
-            string operation = report == null ? "diagnose" : "light";
-            string rgb = report != null && report.Length >= 9 ? report[6] + "," + report[7] + "," + report[8] : "none";
+            string operation = attempts == 0 ? "diagnose" : "light";
+            string rgb = attempts == 0 ? "none" : red + "," + green + "," + blue;
             Log.Event("usb_operation_begin", "operation=" + operation + " attempts=" + attempts + " gap_ms=" + repeatDelayMs + " rgb=" + rgb);
             WriteResult result = null;
-            try { result = Execute(report, attempts, repeatDelayMs); return result; }
+            try { result = Execute(red, green, blue, attempts, repeatDelayMs); return result; }
             finally { Log.Write("usb_operation_completed", result, "operation=" + operation + " duration_ms=" + duration.ElapsedMilliseconds); }
         }
-        internal static WriteResult SendQuiet(byte[] report) { return Execute(report, 1, 0, false); }
-        private static WriteResult Execute(byte[] report, int attempts, int repeatDelayMs, bool verbose = true) {
-            List<string> paths;
+        internal static WriteResult SendQuiet(int red, int green, int blue) { return Execute(red, green, blue, 1, 0, false); }
+        private static WriteResult Execute(int red, int green, int blue, int attempts, int repeatDelayMs, bool verbose = true) {
+            List<Target> paths;
             Stopwatch enumeration = Stopwatch.StartNew();
             if (verbose) Log.Event("usb_enumeration_begin", "");
             try { paths = Paths(); } catch (IOException) { return new WriteResult("enumeration_failed", 0, 0, Marshal.GetLastWin32Error()); }
             if (verbose) Log.Event("usb_enumeration_completed", "matches=" + paths.Count + " duration_ms=" + enumeration.ElapsedMilliseconds);
             if (paths.Count != 1) return new WriteResult(paths.Count == 0 ? "no_supported_device" : "multiple_devices_refused", paths.Count, 0, 0);
-            using (SafeFileHandle file = Open(paths[0], 0x40000000)) {
-                if (file.IsInvalid) return new WriteResult("output_unavailable", 1, 0, Marshal.GetLastWin32Error());
-                if (report == null) return new WriteResult("output_accessible_no_write", 1, 0, 0);
+            Target target = paths[0];
+            using (SafeFileHandle file = Open(target.Path, 0x40000000)) {
+                if (file.IsInvalid) return new WriteResult("output_unavailable", 1, 0, Marshal.GetLastWin32Error()) { Controller = target.Kind.ToString() };
+                if (attempts == 0) return new WriteResult("output_accessible_no_write", 1, 0, 0) { Controller = target.Kind.ToString() };
+                byte[] report = LightReport.Make(target.Kind, red, green, blue);
+                if (verbose) Log.Event("usb_light_target", "controller=" + target.Kind + " output_bytes=" + report.Length);
                 int writes = 0, error = 0;
                 for (int i = 0; i < attempts; i++) {
                     if (i > 0) System.Threading.Thread.Sleep(repeatDelayMs);
@@ -105,7 +111,7 @@ namespace DS4SleepLight {
                     if (completed) writes++;
                     else break;
                 }
-                return new WriteResult(writes == attempts ? "written" : "write_failed", 1, writes, error);
+                return new WriteResult(writes == attempts ? "written" : "write_failed", 1, writes, error) { Controller = target.Kind.ToString() };
             }
         }
         private static bool Write(SafeFileHandle file, byte[] report, out int error) {

@@ -21,7 +21,7 @@ try {
     $shortcut = $shell.CreateShortcut($shortcutPath)
     $shortcut.TargetPath = $resolvedExecutable
     $shortcut.WorkingDirectory = Split-Path -Parent $resolvedExecutable
-    $shortcut.Description = 'DS4 sleep light watcher'
+    $shortcut.Description = 'PS4 / PS5 sleep and idle light watcher'
     $shortcut.WindowStyle = 7
     $shortcut.Save()
 } finally { if ($shortcut) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shortcut) }; [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell) }

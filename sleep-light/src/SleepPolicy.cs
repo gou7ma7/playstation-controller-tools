@@ -37,9 +37,24 @@
         }
         internal void CompleteRestore() { if (Phase == LightPhase.RestorePending) Phase = LightPhase.Ready; }
     }
+    internal enum ControllerKind { DualShock4V2, DualSense }
     internal static class LightReport {
         internal static byte[] Make(int red, int green, int blue) {
+            return Make(ControllerKind.DualShock4V2, red, green, blue);
+        }
+        internal static byte[] Make(ControllerKind kind, int red, int green, int blue) {
             if (red < 0 || red > 255 || green < 0 || green > 255 || blue < 0 || blue > 255) throw new System.ArgumentOutOfRangeException("RGB");
+            if (kind == ControllerKind.DualSense) {
+                // Windows' USB HID collection advertises 48 bytes, including report ID.
+                // Enable only RGB/player LEDs. Haptic, trigger, audio and mute flags stay clear.
+                // Windows USB 输出为 48 字节；只启用灯条/玩家灯，不操作触觉、扳机、音频或静音灯。
+                byte[] ds = new byte[48]; ds[0] = 0x02;
+                ds[2] = (byte)(SleepLightConfig.ControlDualSensePlayerLeds ? 0x14 : 0x04);
+                if (SleepLightConfig.ControlDualSensePlayerLeds && (red != 0 || green != 0 || blue != 0)) ds[44] = (byte)SleepLightConfig.DualSensePlayerLeds;
+                ds[45] = (byte)red; ds[46] = (byte)green; ds[47] = (byte)blue;
+                return ds;
+            }
+            if (kind != ControllerKind.DualShock4V2) throw new System.ArgumentOutOfRangeException("kind");
             byte[] report = new byte[32];
             report[0] = 0x05;
             // Validate lightbar and blink fields only. Motor-enable bit 0 remains clear.
@@ -49,8 +64,15 @@
             return report;
         }
         internal static bool Supported(ushort vendor, ushort product, ushort usagePage, ushort usage, ushort outputLength) {
-            // 32-byte output excludes the Bluetooth report format.
-            return vendor == 0x054c && product == 0x09cc && usagePage == 1 && usage == 5 && outputLength == 32;
+            ControllerKind ignored;
+            return TryKind(vendor, product, usagePage, usage, 64, outputLength, out ignored);
+        }
+        internal static bool TryKind(ushort vendor, ushort product, ushort usagePage, ushort usage, ushort inputLength, ushort outputLength, out ControllerKind kind) {
+            kind = ControllerKind.DualShock4V2;
+            if (vendor != 0x054c || usagePage != 1 || usage != 5 || inputLength != 64) return false;
+            if (product == 0x09cc && outputLength == 32) return true;
+            if (product == 0x0ce6 && outputLength == 48) { kind = ControllerKind.DualSense; return true; }
+            return false;
         }
     }
 }

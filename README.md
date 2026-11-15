@@ -11,7 +11,7 @@ Three independent modules for a Windows controller setup:
 
 - **[mapping/](mapping/README.md)**: left-hand DualShock 4 + right-hand mouse, Steam Input VDF, WASD game settings and champion-specific usage notes. It works without the rumble program.
 - **[rumble/](rumble/README.md)**: Windows USB DS4 feedback based on the local Live Client Data API. It works without this Steam layout and does not require WASD movement or Steam.
-- **[sleep-light/](sleep-light/README.md)**: turn off a USB DS4 lightbar after three minutes of controller inactivity and restore configured blue on controller input. Also sends off before sleep/hibernate; resume/unlock alone does not relight in default idle mode. No Steam or game dependency.
+- **[sleep-light/](sleep-light/README.md)**: turn off USB DS4 v2 or DualSense lights after three minutes of controller inactivity and restore configured blue on controller input. Also sends off before sleep/hibernate; resume/unlock alone does not relight in default idle mode. No Steam or game dependency.
 
 Use any module separately or together. None installs or changes another.
 
@@ -48,7 +48,7 @@ powershell.exe -NoProfile -File .\sleep-light\scripts\build.ps1
 .\sleep-light\dist\DS4SleepLight.exe
 ```
 
-The build runs offline checks without USB writes. [Optional current-user login autostart](sleep-light/README.md#optional-login-autostart) is a separate, reversible step. The watcher only updates lightbar/blink fields; it does not change motor output or remap buttons. [Detailed configuration and verification](sleep-light/docs/configuration.md).
+The build runs offline checks without USB writes. [Optional current-user login autostart](sleep-light/README.md#optional-login-autostart) is a separate, reversible step. The watcher updates only lighting fields, including optional DualSense white player LEDs; it does not change motors, adaptive triggers, microphone mute or button mappings. [Detailed configuration and verification](sleep-light/docs/configuration.md).
 
 ## Customize feedback
 

@@ -12,6 +12,8 @@ All settings are compiled from `config/SleepLightConfig.cs`; edit, exit the runn
 - `IdleWriteRetryMs`: `500..10000`, default `3000`. Time between failed idle-mode output attempts. Reads must remain valid and fresh; a disconnect or ambiguous target prevents writes.
 - `RestoreOnResume`: default `true`, **only used when `EnableIdleLight = false`**. Restore after interactive resume/unlock. If `false`, sleep-only mode never restores color. It does not disable controller-triggered color in idle mode.
 - `Red`, `Green`, `Blue`: integers `0..255`; default `0,0,255`. For dim blue use `0,0,32`; for purple use `96,0,96`. These are raw RGB levels, not Steam's brightness slider. All-zero also keeps it dark after resume.
+- `ControlDualSensePlayerLeds`: default `true`, DualSense only. Set RGB and white player LEDs together; off clears all five white LEDs. Set `false` to leave player LEDs entirely to other software. The microphone mute indicator is never changed.
+- `DualSensePlayerLeds`: `0..31`, default `4` (center LED). Five-bit restore mask, with `1`, `2`, `4`, `8`, `16` selecting individual player LEDs. `0` restores RGB without white LEDs; `31` lights all five. Applied only when player LED control is enabled and requested RGB is nonzero; this cannot recover Steam's previous LED pattern.
 - `RestoreDelayMs`: `0..10000`, default `1500`. Sleep-only mode's delay after resume/unlock so USB can become available.
 - `RestoreRetryWindowMs`: `500..30000`, default `5000`. Sleep-only retry window after the delay. After expiry, wait for the next sleep cycle.
 - `RestoreRetryIntervalMs`: `100..5000`, default `500`. Sleep-only failed restoration retry interval. Success ends retries immediately.
@@ -35,7 +37,7 @@ powershell.exe -NoProfile -File .\scripts\build.ps1 -Language en
 
 The build validates ranges and runs synthetic checks for report fields, device capability filtering, duplicate notifications, deferred unlock restoration, pending-restore cancellation, and the S3 → automatic wake → S4 sequence. No native USB call is made by the test runner.
 
-It also checks USB input format rejection, noise filtering, held controls, the exact 180-second deadline, retries, controller-triggered restore and disconnect/suspend cancellation. The parser and idle policy are in `src/ControllerActivity.cs`; shared, overlapped `ReadFile` with cancellation is in `src/ControllerInput.cs`. See [Microsoft's HID input guidance](https://learn.microsoft.com/en-us/windows-hardware/drivers/hid/obtaining-hid-reports) and [Linux's DualShock 4 report layout](https://github.com/torvalds/linux/blob/master/drivers/hid/hid-playstation.c).
+It also checks DS4 and DualSense USB input layouts, format rejection, noise filtering, held controls, the exact 180-second deadline, retries, controller-triggered restore and disconnect/suspend cancellation. The parser and idle policy are in `src/ControllerActivity.cs`; shared, overlapped `ReadFile` with cancellation is in `src/ControllerInput.cs`. See [Microsoft's HID input guidance](https://learn.microsoft.com/en-us/windows-hardware/drivers/hid/obtaining-hid-reports) and [Linux's PlayStation report layouts](https://github.com/torvalds/linux/blob/master/drivers/hid/hid-playstation.c). Windows advertises 48 bytes for DualSense USB output on the supported gamepad collection; Linux's padded USB output struct has a different length. Do not substitute DS4's 32-byte layout or Bluetooth's 78-byte layout.
 
 Read-only input probe (no light reports):
 
@@ -58,6 +60,7 @@ Every record has UTC/local time, an ephemeral `run` ID, sequence, process/thread
 - `session_received` / `session_apply_begin` / `session_applied`: distinguish callback arrival from queued UI handling; report lock/unlock and current policy state.
 - `suspend_off_begin` / `suspend_off`: beginning/completion of the light-off operation, result and total duration.
 - `usb_operation_*`, `usb_enumeration_*`, `usb_write_attempt_*`: operation, target count, requested RGB, attempt result, Win32 error and duration. `usb_cancel_wait_*` brackets cancellation cleanup, which may be delayed by the driver.
+- `usb_light_target`: selected controller kind and output length; no device identity/path is recorded. Diagnostic JSON and input connection/heartbeat records also distinguish `DualShock4V2` from `DualSense`.
 - `interactive_resume_restore_scheduled`, `resume_restore_*`: restore delay, RGB, write result, retry or completion. Background automatic resume still sends no restore color.
 - `input_status`, `input_connected_no_light_write`, `idle_input_baseline_no_light_write`, `idle_input_lost_no_light_write`: input access, fresh baseline and unavailable input. A baseline sends no color.
 - `idle_timeout_off`: off write result and inactivity duration. It also reasserts off after sleep/reconnect when the policy was already dark; an `idle_ms` below the timeout distinguishes that case.

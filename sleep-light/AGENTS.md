@@ -2,14 +2,16 @@
 
 - Scope: all of `sleep-light/`; build and run independently of mapping, rumble, Steam and LoL.
 - Read README, `docs/configuration.md`, configuration, all `src/` files and offline tests.
-- Windows x64, one USB DS4 v2 054C:09CC, gamepad usage, 64-byte USB input and 32-byte output only. Refuse ambiguous multiple targets.
-- Preserve report 0x05 / flags 0x06: RGB and blink only; do not enable motor, audio or unrelated fields.
+- Windows x64, one USB DS4 v2 054C:09CC or USB DualSense 054C:0CE6, gamepad usage and 64-byte USB input. Select the controller protocol from validated HID attributes/capabilities. Refuse ambiguous multiple targets across either model. Bluetooth, DS4 v1 and DualSense Edge are outside the implemented device support.
+- DS4: preserve 32-byte report 0x05 / flags 0x06 (RGB/blink). DualSense: Windows 48-byte report 0x02, valid_flag0=0, valid_flag1=0x04 (RGB) or 0x14 (RGB/player LEDs), valid_flag2=0; player mask at 44, RGB at 45..47. Never enable motor, adaptive-trigger, audio, mute-state or LED-animation fields. Build reports after selecting the device; never reuse a DS4 report for DualSense.
 - Starting/exiting must not write lights. Shared HID input may be observed only for controller inactivity; never inject/remap gameplay input or access game APIs/memory, power settings or BIOS.
 - Background PBT_APMRESUMEAUTOMATIC must not restore RGB; S3 can automatically wake only to enter S4.
 - Default idle mode: three minutes without buttons/sticks/triggers turns lights off; actual controller activity restores configured RGB. Neutral reports, packet counters, gyro/accelerometer, battery and touch motion are not activity. Held controls count; stick deadzone and trigger threshold filter noise.
 - Idle mode never restores RGB merely on resume/unlock. Discard stale queued input across suspend/reconnect/long UI gaps. Reassert off periodically only while idle and the OS is running. Locked sessions may turn off but may not restore color.
 - With EnableIdleLight=false, retain the original interactive resume/unlock restoration and pending-restore cancellation on suspend/lock.
 - Config: `config/SleepLightConfig.cs`; compile-time RGB default blue. Do not claim restoration of Steam's last color.
+- DualSense white player indicators default to off with RGB and center LED on restore; both the control toggle and restore mask are configurable. Preserve the microphone mute indicator. USB input button/trigger offsets differ from DS4; counters, motion and status remain excluded.
+- Keep the existing DS4SleepLight.exe name and singleton/stop event names for compatibility with installed Startup shortcuts and old instances.
 - Build `scripts/build.ps1`; offline checks must not invoke HID or suspend the PC.
 - Native write completion is not proof of visible light or actual sleep behavior; describe verification accurately.
 - Diagnostic logs are best-effort and non-identifying. Heartbeat/device-change records must not perform USB IO or write lights. Log idle transitions and aggregate input/refresh counts, never raw buttons, coordinates or report data. 日志仅记录状态与汇总，不记录原始按键或数据包。

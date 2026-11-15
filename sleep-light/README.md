@@ -1,15 +1,16 @@
-# DS4 sleep and idle light
+# PS4 / PS5 sleep and idle light
 
 [简体中文](README.zh-CN.md) · English
 
 > **Review the source and build locally. Do not directly run an `.exe` downloaded from the internet.**
 
-An independent Windows tray utility for **one USB DualShock 4 v2 (`054C:09CC`)**. By default it turns the light off after **three minutes without controller input** and restores configured blue when the controller is used again. It also sends off before sleep/hibernate. It needs neither Steam, League of Legends, nor the other repository modules.
+An independent Windows tray utility for **one USB DualShock 4 v2 (`054C:09CC`) or DualSense (`054C:0CE6`)**. By default it turns the lights off after **three minutes without controller input** and restores configured blue when the controller is used again. It also sends off before sleep/hibernate. It needs neither Steam, League of Legends, nor the other repository modules. The executable remains `DS4SleepLight.exe` to preserve existing launch and login shortcuts.
 
 ## Behavior
 
 - Starting or exiting the watcher does not change the light.
-- On `PBT_APMSUSPEND`, send a 32-byte USB report with RGB zero. Only lightbar/blink fields are enabled (`0x06`); motor fields are disabled. USB power stays connected.
+- On `PBT_APMSUSPEND`, send RGB zero using the detected controller's protocol. DS4 uses a 32-byte report `0x05` with lightbar/blink flags `0x06`; DualSense uses the Windows 48-byte report `0x02` with RGB/player-LED flags. Motors, adaptive triggers, audio and microphone mute remain untouched. USB power stays connected.
+- DualSense's white player indicators turn off with RGB by default and restore as one center LED. Set `ControlDualSensePlayerLeds = false` to leave them to Steam, or change the restore mask. The microphone mute light is preserved because it indicates microphone state.
 - On a background automatic resume, keep the light off. This includes a timer wake that may immediately transition from S3 to S4.
 - **Default idle mode:** after 180 seconds without controller use, send off. A button press/release, d-pad, stick past the deadzone or trigger past its threshold counts as use; a held control also counts. Mouse/keyboard activity, neutral USB packets, counters, motion sensors, battery updates and touchpad movement do not. A touchpad click counts as a button.
 - While idle and the OS is awake, reassert off every five seconds to counter other software changing the light. On controller activity, restore the configured RGB, **blue (`0,0,255`) by default**. While actively used, no periodic color commands are sent, so Steam may change it afterward.
@@ -17,7 +18,7 @@ An independent Windows tray utility for **one USB DualShock 4 v2 (`054C:09CC`)**
 - Set `EnableIdleLight = false` and rebuild for the original sleep-only mode: restore after interactive resume/unlock, with a 1.5-second delay and a brief retry window. `RestoreOnResume` applies only to that mode.
 - The program cannot read or automatically restore Steam's last RGB/brightness setting, and cannot execute off refreshes while Windows is asleep. Idle mode helps before sleep but does not guarantee that another application's final write or a USB/firmware transition cannot relight it.
 
-USB DS4 v1, Bluetooth DS4, DualSense and multiple connected target controllers are unsupported. Multiple matching controllers result in no writes, avoiding an ambiguous target.
+USB DS4 v1, DualSense Edge, Bluetooth controllers and multiple connected target controllers are unsupported. Multiple matching controllers, including one DS4 plus one DualSense, result in no writes. Disconnect extra targets and virtual copies before testing. Attribute, gamepad usage and input/output length checks select the report format; Bluetooth reports are not accepted.
 
 ## Review, build and run
 
@@ -79,13 +80,15 @@ Successful HID write completion does not independently confirm the visible light
 
 For idle mode, leave the controller untouched for at least three minutes, observe off, then press a button or move a stick and observe configured blue. Verify again with Steam running. Offline checks cover noise filtering, held controls, the 180-second boundary, retries, reconnection and suspend cancellation; they do not confirm visible behavior.
 
-The original user confirmed the default **three-minute idle off → controller input → blue restore** with Steam running; native logs also recorded both writes. Shared input reading passed a stationary probe with 751 reports in three seconds and zero activity samples. These observations apply to that USB controller, not every device.
+For USB DS4 v2, the original user confirmed **three-minute idle off → controller input → blue restore** with Steam running; native logs also recorded both writes. A stationary probe read 751 reports in three seconds with zero activity samples. These observations apply to that USB controller, not every device.
+
+USB DualSense support was checked with Steam running: a stationary read-only probe received 752 reports in three seconds with zero activity samples. The user confirmed that a ten-second physical test turned off both RGB and white player LEDs, then restored configured blue and the center white LED. A full DualSense sleep/hibernate transition remains a separate physical test.
 
 The original sleep-only version previously passed a user-observed S3 cycle. Later sleep failures were reported despite successful pre-suspend writes; the idle test does not establish reliable S4 or automatic S3-to-S4 behavior. Full sleep behavior still requires separate observation.
 
 ## Coexistence and limits
 
-The repository's rumble reports enable only motors (`0x01`); this module enables only lightbar/blink (`0x06`). Their report fields do not replace one another. Both use shared USB handles. No integration or dependency is required between the modules.
+For DS4, the repository's rumble reports enable only motors (`0x01`), while this module enables only lightbar/blink (`0x06`). DualSense lighting enables only RGB and optional player indicators; motor, haptic, trigger, audio, mute and animation flags stay clear. Shared handles allow coexistence, but other lighting writers can still overwrite color. The rumble module remains DS4-only; adding DualSense lighting does not add DualSense game feedback.
 
 Other software that also writes the lightbar, exclusive HID access, device removal during transition, or missing/delayed Windows power notifications may prevent a visible response. The program does not keep the computer awake, disconnect USB, change BIOS/power settings, remap buttons, read game data or read game memory. Physical behavior must be checked on your device; no guarantee is made solely from a successful write.
 

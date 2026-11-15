@@ -9,6 +9,7 @@ namespace DS4SleepLight {
         private static void Check(string name, bool condition) { if (!condition) throw new Exception(name); checks.Add(name); }
         private static void Case(string name, Action body) { body(); checks.Add(name); }
         private static byte[] NeutralReport() { byte[] report = new byte[64]; report[0] = 1; report[1] = report[2] = report[3] = report[4] = 128; report[5] = 8; return report; }
+        private static byte[] NeutralDualSenseReport() { byte[] report = NeutralReport(); report[5] = 0; report[8] = 8; return report; }
         private static bool Activity(ControllerActivity detector, byte[] report) { bool activity; if (!detector.Observe(report, report.Length, out activity)) throw new Exception("Valid report rejected"); return activity; }
         internal static int Main(string[] args) {
             try {
@@ -28,7 +29,24 @@ namespace DS4SleepLight {
                 Case("large RGB rejected", delegate { bool rejected = false; try { LightReport.Make(256, 0, 0); } catch (ArgumentOutOfRangeException) { rejected = true; } Check("large channel rejected", rejected); });
                 Check("USB v2 accepted", LightReport.Supported(0x054c, 0x09cc, 1, 5, 32));
                 Check("DS4 v1 rejected", !LightReport.Supported(0x054c, 0x05c4, 1, 5, 32));
-                Check("DualSense rejected", !LightReport.Supported(0x054c, 0x0ce6, 1, 5, 32));
+                Check("DualSense cannot use DS4 output", !LightReport.Supported(0x054c, 0x0ce6, 1, 5, 32));
+                ControllerKind selected;
+                Check("USB DualSense selects its own protocol", LightReport.TryKind(0x054c, 0x0ce6, 1, 5, 64, 48, out selected) && selected == ControllerKind.DualSense);
+                Check("USB DS4 keeps its original protocol", LightReport.TryKind(0x054c, 0x09cc, 1, 5, 64, 32, out selected) && selected == ControllerKind.DualShock4V2);
+                Check("DualSense Bluetooth refused", !LightReport.TryKind(0x054c, 0x0ce6, 1, 5, 78, 78, out selected));
+                Check("DualSense short input capability refused", !LightReport.TryKind(0x054c, 0x0ce6, 1, 5, 10, 48, out selected));
+                Check("unknown Sony controller refused", !LightReport.Supported(0x054c, 0x0df2, 1, 5, 48));
+                Check("other vendor refused", !LightReport.Supported(0x1234, 0x0ce6, 1, 5, 48));
+                Check("DualSense non-gamepad collection refused", !LightReport.Supported(0x054c, 0x0ce6, 1, 2, 48));
+                byte[] dsOff = LightReport.Make(ControllerKind.DualSense, 0, 0, 0), dsColor = LightReport.Make(ControllerKind.DualSense, 7, 83, 255);
+                Check("DualSense Windows USB report length and id", dsOff.Length == 48 && dsOff[0] == 2 && dsColor.Length == 48);
+                Check("DualSense only light enable flags", dsColor[1] == 0 && dsColor[2] == (SleepLightConfig.ControlDualSensePlayerLeds ? 0x14 : 0x04) && dsColor[39] == 0);
+                Check("DualSense RGB layout", dsColor[45] == 7 && dsColor[46] == 83 && dsColor[47] == 255);
+                Check("DualSense RGB and player lights off", dsOff[44] == 0 && dsOff[45] == 0 && dsOff[46] == 0 && dsOff[47] == 0);
+                Check("DualSense player lights use configured mask", dsColor[44] == (SleepLightConfig.ControlDualSensePlayerLeds ? SleepLightConfig.DualSensePlayerLeds : 0));
+                bool unrelatedClear = true;
+                for (int i = 3; i < 44; i++) unrelatedClear &= dsColor[i] == 0 && dsOff[i] == 0;
+                Check("DualSense motors triggers audio mute and LED animations untouched", unrelatedClear);
                 Check("Bluetooth report rejected", !LightReport.Supported(0x054c, 0x09cc, 1, 5, 78));
                 Check("non-controller interface rejected", !LightReport.Supported(0x054c, 0x09cc, 1, 2, 32));
                 SleepPolicy p = new SleepPolicy(true);
@@ -82,6 +100,34 @@ namespace DS4SleepLight {
                 Check("Bluetooth input format refused", !detector.Observe(report, 64, out observed));
                 report = NeutralReport(); Check("short input refused", !detector.Observe(report, 10, out observed));
                 report[5] = 15; Check("invalid dpad refused", !detector.Observe(report, 64, out observed));
+                ControllerActivity dsDetector = new ControllerActivity(ControllerKind.DualSense, 32, 12);
+                byte[] dsInput = NeutralDualSenseReport();
+                Check("DualSense first input is a baseline", !Activity(dsDetector, dsInput));
+                dsInput[7] = 255; dsInput[10] = 0xf8; dsInput[11] = 255; dsInput[16] = 192; dsInput[33] = 59; dsInput[53] = 11;
+                Check("DualSense sequence gyro touch battery and reserved bits ignored", !Activity(dsDetector, dsInput));
+                dsInput[5] = 11; dsInput[6] = 11; dsInput[9] = 12; dsInput[1] = 160;
+                Check("DualSense trigger noise and deadzone boundary ignored", !Activity(dsDetector, dsInput));
+                dsInput[5] = 12; Check("DualSense L2 analog location recognized", Activity(dsDetector, dsInput));
+                Check("DualSense held trigger stays active", Activity(dsDetector, dsInput));
+                dsInput = NeutralDualSenseReport(); Check("DualSense trigger release counts", Activity(dsDetector, dsInput));
+                dsInput[6] = 12; Check("DualSense R2 analog location recognized", Activity(dsDetector, dsInput));
+                dsInput = NeutralDualSenseReport(); Activity(dsDetector, dsInput); dsInput[9] = 1;
+                Check("DualSense shoulder recognized", Activity(dsDetector, dsInput));
+                Check("DualSense held button stays active", Activity(dsDetector, dsInput));
+                dsInput[9] = 0; Check("DualSense button release counts", Activity(dsDetector, dsInput));
+                dsInput[8] = 0; Check("DualSense dpad location recognized", Activity(dsDetector, dsInput));
+                dsInput = NeutralDualSenseReport(); Activity(dsDetector, dsInput); dsInput[8] |= 0x20;
+                Check("DualSense face button recognized", Activity(dsDetector, dsInput));
+                dsInput = NeutralDualSenseReport(); Activity(dsDetector, dsInput); dsInput[10] = 2;
+                Check("DualSense touchpad click recognized", Activity(dsDetector, dsInput));
+                dsInput[10] = 1; Check("DualSense PS button recognized", Activity(dsDetector, dsInput));
+                dsInput[10] = 4; Check("DualSense mute button recognized without changing mute state", Activity(dsDetector, dsInput));
+                dsInput = NeutralDualSenseReport(); Activity(dsDetector, dsInput); dsInput[3] = 161;
+                Check("DualSense stick outside deadzone recognized", Activity(dsDetector, dsInput));
+                dsInput = NeutralDualSenseReport(); dsInput[0] = 0x31;
+                Check("DualSense Bluetooth report rejected", !dsDetector.Observe(dsInput, 64, out observed));
+                dsInput = NeutralDualSenseReport(); Check("DualSense short report rejected", !dsDetector.Observe(dsInput, 10, out observed));
+                dsInput[8] = 15; Check("DualSense invalid dpad rejected", !dsDetector.Observe(dsInput, 64, out observed));
                 IdleLightPolicy idle = new IdleLightPolicy(180000, 5000, 3000);
                 Check("no writes before input connection", idle.Next(500000) == IdleLightAction.None);
                 idle.Connected(1000); Check("startup baseline does not write a color", idle.Next(1000) == IdleLightAction.None);

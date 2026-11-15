@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
@@ -38,7 +38,7 @@ namespace DS4SleepLight {
             if (!SleepLightConfig.EnableLocalLog) return;
             lock (gate) {
                 DateTime utc = DateTime.UtcNow;
-                string fields = result == null ? "" : "outcome=" + result.Outcome + " matches=" + result.Matches + " writes=" + result.Writes + " win32=" + result.Win32Error;
+                string fields = result == null ? "" : "outcome=" + result.Outcome + " matches=" + result.Matches + " writes=" + result.Writes + " win32=" + result.Win32Error + " controller=" + result.Controller;
                 string line = utc.ToString("o", CultureInfo.InvariantCulture) + " local=" + utc.ToLocalTime().ToString("o", CultureInfo.InvariantCulture)
                     + " run=" + run + " seq=" + (++sequence).ToString(CultureInfo.InvariantCulture) + " pid=" + processId
                     + " tid=" + Thread.CurrentThread.ManagedThreadId + " elapsed_ms=" + clock.ElapsedMilliseconds
@@ -62,7 +62,7 @@ namespace DS4SleepLight {
         }
         internal static void SaveDiagnostic(string path, WriteResult result) {
             File.WriteAllText(Path.GetFullPath(path), new JavaScriptSerializer().Serialize(new {
-                version = 1, supportedDevice = "USB DS4 v2 054C:09CC", outcome = result.Outcome,
+                version = 1, supportedDevice = "USB DS4 v2 054C:09CC or DualSense 054C:0CE6", controller = result.Controller, outcome = result.Outcome,
                 matchingControllers = result.Matches, reportsWritten = result.Writes, win32Error = result.Win32Error
             }));
         }
@@ -106,7 +106,7 @@ namespace DS4SleepLight {
             if (SleepLightConfig.EnableIdleLight) { input = new ControllerInput(); input.Enable(true); }
             timer.Interval = 100; timer.Tick += delegate { TraceTick(); RestoreTick(); IdleTick(); }; timer.Start();
             SystemEvents.SessionSwitch += SessionChanged;
-            Trace("watcher_started_no_light_write", "log_schema=3 rgb=" + SleepLightConfig.Red + "," + SleepLightConfig.Green + "," + SleepLightConfig.Blue
+            Trace("watcher_started_no_light_write", "log_schema=4 rgb=" + SleepLightConfig.Red + "," + SleepLightConfig.Green + "," + SleepLightConfig.Blue
                 + " idle_enabled=" + SleepLightConfig.EnableIdleLight + " idle_seconds=" + SleepLightConfig.IdleTimeoutSeconds
                 + " stick_deadzone=" + SleepLightConfig.StickDeadzone + " trigger_threshold=" + SleepLightConfig.TriggerThreshold + " idle_off_refresh_ms=" + SleepLightConfig.IdleOffRefreshMs
                 + " restore=" + SleepLightConfig.RestoreOnResume + " restore_delay_ms=" + SleepLightConfig.RestoreDelayMs
@@ -126,7 +126,7 @@ namespace DS4SleepLight {
             if (clock.Elapsed.TotalMilliseconds >= nextHeartbeat) {
                 nextHeartbeat = clock.Elapsed.TotalMilliseconds + 60000;
                 Trace("heartbeat_no_usb_write", "restore_due_in_ms=" + (policy.Phase == LightPhase.RestorePending ? Math.Max(0, nextAttempt - clock.Elapsed.TotalMilliseconds).ToString("0", CultureInfo.InvariantCulture) : "none"));
-                if (input != null) { InputSnapshot snapshot = input.Snapshot(); Trace("idle_input_heartbeat_no_light_write", "input_status=" + snapshot.Status + " reports=" + snapshot.Reports + " idle_ms=" + idle.IdleMilliseconds(clock.Elapsed.TotalMilliseconds).ToString("0", CultureInfo.InvariantCulture) + " refreshes=" + idleRefreshes); }
+                if (input != null) { InputSnapshot snapshot = input.Snapshot(); Trace("idle_input_heartbeat_no_light_write", "input_status=" + snapshot.Status + " controller=" + snapshot.Controller + " reports=" + snapshot.Reports + " idle_ms=" + idle.IdleMilliseconds(clock.Elapsed.TotalMilliseconds).ToString("0", CultureInfo.InvariantCulture) + " refreshes=" + idleRefreshes); }
             }
         }
         private static string PowerName(int id) {
@@ -154,7 +154,7 @@ namespace DS4SleepLight {
             if (input != null) { input.Enable(false); inputWasConnected = false; idle.Suspend(); idleOffReported = false; }
             Trace("suspend_off_begin", "rgb=0,0,0");
             Stopwatch duration = Stopwatch.StartNew();
-            WriteResult result = NativeHid.Send(LightReport.Make(0, 0, 0), SleepLightConfig.OffWriteAttempts, SleepLightConfig.OffRepeatDelayMs);
+            WriteResult result = NativeHid.Send(0, 0, 0, SleepLightConfig.OffWriteAttempts, SleepLightConfig.OffRepeatDelayMs);
             Log.Write("suspend_off", result, "duration_ms=" + duration.ElapsedMilliseconds + " phase=" + policy.Phase);
             SetStatus(result.Success ? Ui.Text("已发送灭灯指令", "Light-off command sent") : FailureText(result));
         }
@@ -196,8 +196,8 @@ namespace DS4SleepLight {
             IdleLightAction action = idle.Next(now);
             if (action == IdleLightAction.None || (action == IdleLightAction.Color && policy.Locked)) return;
             bool refresh = action == IdleLightAction.Off && idleOffReported;
-            WriteResult result = refresh ? NativeHid.SendQuiet(LightReport.Make(0, 0, 0))
-                : NativeHid.Send(action == IdleLightAction.Off ? LightReport.Make(0, 0, 0) : LightReport.Make(SleepLightConfig.Red, SleepLightConfig.Green, SleepLightConfig.Blue), 1, 0);
+            WriteResult result = refresh ? NativeHid.SendQuiet(0, 0, 0)
+                : NativeHid.Send(action == IdleLightAction.Off ? 0 : SleepLightConfig.Red, action == IdleLightAction.Off ? 0 : SleepLightConfig.Green, action == IdleLightAction.Off ? 0 : SleepLightConfig.Blue, 1, 0);
             idle.Completed(action, result.Success, clock.Elapsed.TotalMilliseconds);
             if (refresh) {
                 idleRefreshes++;
@@ -224,14 +224,14 @@ namespace DS4SleepLight {
             }
             Trace("resume_restore_begin", "rgb=" + SleepLightConfig.Red + "," + SleepLightConfig.Green + "," + SleepLightConfig.Blue);
             Stopwatch duration = Stopwatch.StartNew();
-            WriteResult result = NativeHid.Send(LightReport.Make(SleepLightConfig.Red, SleepLightConfig.Green, SleepLightConfig.Blue), 1, 0);
+            WriteResult result = NativeHid.Send(SleepLightConfig.Red, SleepLightConfig.Green, SleepLightConfig.Blue, 1, 0);
             Log.Write("resume_restore", result, "duration_ms=" + duration.ElapsedMilliseconds + " phase=" + policy.Phase);
             if (result.Success) { policy.CompleteRestore(); SetStatus(Ui.Text("已恢复配置灯色，等待睡眠", "Configured color restored; waiting for sleep")); }
             else { nextAttempt = clock.Elapsed.TotalMilliseconds + SleepLightConfig.RestoreRetryIntervalMs; SetStatus(FailureText(result)); }
             Trace("resume_restore_handled", "retry_in_ms=" + (result.Success ? "none" : SleepLightConfig.RestoreRetryIntervalMs.ToString(CultureInfo.InvariantCulture)));
         }
         private static string FailureText(WriteResult result) {
-            if (result.Outcome == "no_supported_device") return Ui.Text("未连接支持的 USB DS4", "Supported USB DS4 not connected");
+            if (result.Outcome == "no_supported_device") return Ui.Text("未连接支持的 USB PS4/PS5 手柄", "Supported USB PS4/PS5 controller not connected");
             if (result.Outcome == "multiple_devices_refused") return Ui.Text("多个手柄，未发送指令", "Multiple controllers; no command sent");
             return Ui.Text("写入未完成，请检查连接/日志", "Write unavailable; check connection/log");
         }
@@ -258,16 +258,16 @@ namespace DS4SleepLight {
                     int seconds; if (!int.TryParse(args[1], out seconds) || seconds < 1 || seconds > 30) throw new ArgumentException("Input diagnosis duration must be 1..30 seconds.");
                     InputSnapshot snapshot;
                     using (ControllerInput observer = new ControllerInput()) { observer.Enable(true); Thread.Sleep(seconds * 1000); snapshot = observer.Snapshot(); }
-                    File.WriteAllText(Path.GetFullPath(args[2]), new JavaScriptSerializer().Serialize(new { seconds = seconds, sharedRead = true, connected = snapshot.Connected, status = snapshot.Status, reportsRead = snapshot.Reports, activitySamples = snapshot.Activity, reportsWritten = 0 }));
+                    File.WriteAllText(Path.GetFullPath(args[2]), new JavaScriptSerializer().Serialize(new { seconds = seconds, sharedRead = true, controller = snapshot.Controller, connected = snapshot.Connected, status = snapshot.Status, reportsRead = snapshot.Reports, activitySamples = snapshot.Activity, reportsWritten = 0 }));
                     return snapshot.Reports > 0 ? 0 : 1;
                 }
                 if (args.Length == 3 && args[0] == "--test-cycle") {
                     int seconds; if (!int.TryParse(args[1], out seconds) || seconds < 1 || seconds > 30) throw new ArgumentException("Test duration must be 1..30 seconds.");
                     Log.Event("manual_test_begin", "seconds=" + seconds);
-                    WriteResult off = NativeHid.Send(LightReport.Make(0, 0, 0), SleepLightConfig.OffWriteAttempts, SleepLightConfig.OffRepeatDelayMs);
+                    WriteResult off = NativeHid.Send(0, 0, 0, SleepLightConfig.OffWriteAttempts, SleepLightConfig.OffRepeatDelayMs);
                     WriteResult restored;
                     try { if (off.Success) Thread.Sleep(seconds * 1000); }
-                    finally { restored = NativeHid.Send(LightReport.Make(SleepLightConfig.Red, SleepLightConfig.Green, SleepLightConfig.Blue), 1, 0); }
+                    finally { restored = NativeHid.Send(SleepLightConfig.Red, SleepLightConfig.Green, SleepLightConfig.Blue, 1, 0); }
                     File.WriteAllText(Path.GetFullPath(args[2]), new JavaScriptSerializer().Serialize(new { offWritten = off.Success, configuredColorWritten = restored.Success, offOutcome = off.Outcome, restoreOutcome = restored.Outcome, seconds = seconds }));
                     Log.Event("manual_test_completed", "seconds=" + seconds + " off=" + off.Success + " restored=" + restored.Success);
                     return off.Success && restored.Success ? 0 : 1;
@@ -286,7 +286,7 @@ namespace DS4SleepLight {
                 return 0;
             } catch (Exception error) {
                 Log.Write("fatal_" + error.GetType().Name, null);
-                MessageBox.Show(Ui.Text("DS4 灭灯工具无法完成操作：", "DS4 sleep light operation failed: ") + error.Message, "DS4SleepLight"); return 1;
+                MessageBox.Show(Ui.Text("手柄灭灯工具无法完成操作：", "Controller light operation failed: ") + error.Message, "DS4SleepLight"); return 1;
             }
         }
     }

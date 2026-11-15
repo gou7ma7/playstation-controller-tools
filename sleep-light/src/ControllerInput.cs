@@ -12,6 +12,7 @@ namespace DS4SleepLight {
         internal long Generation, Reports, Activity;
         internal double LastReportMs;
         internal string Status = "waiting";
+        internal string Controller = "none";
     }
     internal sealed class ControllerInput : IDisposable {
         private readonly object gate = new object();
@@ -21,7 +22,7 @@ namespace DS4SleepLight {
         private int epoch;
         private readonly InputSnapshot state = new InputSnapshot();
         internal static double Now { get { return Stopwatch.GetTimestamp() * 1000.0 / Stopwatch.Frequency; } }
-        internal ControllerInput() { worker = new Thread(Run); worker.IsBackground = true; worker.Name = "DS4 input observer"; worker.Start(); }
+        internal ControllerInput() { worker = new Thread(Run); worker.IsBackground = true; worker.Name = "Controller input observer"; worker.Start(); }
         internal void Enable(bool value) {
             lock (gate) {
                 if (enabled == value) return;
@@ -30,7 +31,7 @@ namespace DS4SleepLight {
             wake.Set();
         }
         internal InputSnapshot Snapshot() {
-            lock (gate) { return new InputSnapshot { Connected = state.Connected, Generation = state.Generation, Reports = state.Reports, Activity = state.Activity, LastReportMs = state.LastReportMs, Status = state.Status }; }
+            lock (gate) { return new InputSnapshot { Connected = state.Connected, Generation = state.Generation, Reports = state.Reports, Activity = state.Activity, LastReportMs = state.LastReportMs, Status = state.Status, Controller = state.Controller }; }
         }
         private void SetStatus(string status) {
             lock (gate) {
@@ -45,7 +46,7 @@ namespace DS4SleepLight {
                     int session = epoch;
                     try {
                         using (NativeHid.InputStream stream = NativeHid.OpenInput()) {
-                            ControllerActivity detector = new ControllerActivity(SleepLightConfig.StickDeadzone, SleepLightConfig.TriggerThreshold);
+                            ControllerActivity detector = new ControllerActivity(stream.Kind, SleepLightConfig.StickDeadzone, SleepLightConfig.TriggerThreshold);
                             bool first = true;
                             while (enabled && !stopping && epoch == session) {
                                 int length;
@@ -54,7 +55,7 @@ namespace DS4SleepLight {
                                 if (!detector.Observe(stream.Buffer, length, out activity)) { SetStatus("unsupported_input_report"); break; }
                                 lock (gate) {
                                     if (stopping || !enabled || epoch != session) break;
-                                    if (first) { state.Generation++; first = false; Log.Event("input_connected_no_light_write", "shared_read=true input_bytes=64"); }
+                                    if (first) { state.Generation++; first = false; state.Controller = stream.Kind.ToString(); Log.Event("input_connected_no_light_write", "controller=" + stream.Kind + " shared_read=true input_bytes=64"); }
                                     state.Connected = true; state.Status = "connected"; state.Reports++; state.LastReportMs = Now;
                                     if (activity) state.Activity++;
                                 }
@@ -79,20 +80,21 @@ namespace DS4SleepLight {
         [DllImport("kernel32.dll", SetLastError = true)] private static extern bool ReadFile(SafeFileHandle file, IntPtr buffer, uint count, out uint read, IntPtr overlapped);
         [DllImport("kernel32.dll", SetLastError = true)] private static extern bool ResetEvent(SafeWaitHandle handle);
         internal static InputStream OpenInput() {
-            List<string> paths = Paths(true);
+            List<Target> paths = Paths();
             if (paths.Count != 1) throw new IOException(paths.Count == 0 ? "no_supported_input_device" : "multiple_input_devices_refused");
-            SafeFileHandle file = Open(paths[0], 0x80000000);
+            SafeFileHandle file = Open(paths[0].Path, 0x80000000);
             if (file.IsInvalid) { file.Dispose(); throw new IOException("shared_input_unavailable"); }
-            return new InputStream(file);
+            return new InputStream(file, paths[0].Kind);
         }
         internal sealed class InputStream : IDisposable {
             internal readonly byte[] Buffer = new byte[64];
+            internal readonly ControllerKind Kind;
             private readonly SafeFileHandle file;
             private readonly SafeWaitHandle completion;
             private GCHandle pinned;
             private IntPtr ov;
-            internal InputStream(SafeFileHandle handle) {
-                file = handle; completion = CreateEvent(IntPtr.Zero, true, false, null);
+            internal InputStream(SafeFileHandle handle, ControllerKind kind) {
+                Kind = kind; file = handle; completion = CreateEvent(IntPtr.Zero, true, false, null);
                 if (completion.IsInvalid) { file.Dispose(); completion.Dispose(); throw new IOException("input_event_unavailable"); }
                 try { pinned = GCHandle.Alloc(Buffer, GCHandleType.Pinned); ov = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(Overlapped))); }
                 catch { Dispose(); throw; }
